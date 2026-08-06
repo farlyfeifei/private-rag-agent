@@ -6,6 +6,22 @@
 
 ---
 
+## 🟢 快路径：实例已就绪（8/6 状态）
+
+**你的 Radeon Cloud 实例已经在运行了**（`u-7102-1179e4d5`，Qwen3.6-35B-A3B + llama.cpp/Vulkan）。
+
+1. 浏览器打开：**https://developer.amd.com.cn/radeon/instances/u-7102-1179e4d5/lab**
+   （若提示登录，用微信/手机号登录后自动进入）
+2. 在文件列表里会看到官方 workshop 笔记本 `hermes-agent-vllm-local-serving-radeon-workshop.ipynb`
+   → 打开 → **Run All** → 启动模型推理服务
+3. 再打开我上传的 **`private-rag-agent-benchmark.ipynb`** → **Run All**
+   → 自动输出 `rocminfo` / `rocm-smi` / tokens/s 基准
+4. 把每格输出截图存到本机 `benchmarks/`，填进 README 性能表即可
+
+> 若 workshop 服务没启动成功，再走下面的完整流程用 Terminal 跑 `deploy_rc.sh`。
+
+---
+
 ## ⏱️ 你需要操作的部分（约 10 分钟）
 
 ### 第 1 步：登录 AMD AI 开发者计划
