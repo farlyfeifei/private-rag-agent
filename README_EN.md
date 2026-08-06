@@ -139,6 +139,8 @@ User question
    │   · LLM-as-judge: claim-by-claim verdict
    ▼
 4. Synthesizer ── composes the final answer ONLY from verified content
+   (sub-reports whose grounding falls below the threshold, or with no
+   retrieved sources, are excluded from synthesis and disclosed instead)
    │
    ▼
 5. Final verification ── groundedness + citation checks re-run on the
@@ -221,7 +223,7 @@ The final answer ships with a verification object — grounding score, per-sente
 
 - Embedding and reranker models are **module-level singletons** — across n parallel researcher agents, exactly one copy is loaded into VRAM, no matter how many agents run.
 - Retrieval and reranking load **lazily on first use**, so the app starts without pre-committing VRAM.
-- All access to native ChromaDB (hnswlib) and torch cross-encoder resources is serialized through a **process-level reentrant lock**. hnswlib and torch native code are not thread-safe; concurrent `collection.query` or cross-encoder inference can segfault (exit 139). Serializing only the native paths adds milliseconds of contention while LLM inference — the expensive part — runs concurrently through the Ollama/vLLM service.
+- All access to native ChromaDB (hnswlib) and torch cross-encoder resources is serialized through a **process-level reentrant lock**. hnswlib and torch native code are not thread-safe; concurrent `collection.query` or cross-encoder inference can segfault (exit 139). Serializing the native paths adds milliseconds of contention, while the expensive downstream LLM generation runs concurrently through the Ollama/vLLM service.
 - The UI's GPU panel reads real metrics via `pyamdgpuinfo`, falling back to `rocm-smi`, and to live demo data when no AMD GPU is present (so the interface stays functional during development).
 
 ### 4. Verification and monitoring
@@ -235,7 +237,7 @@ python benchmarks/bench_amd.py # auto-detect platform and report tokens/s
 
 The benchmark (`benchmarks/bench_amd.py`) detects the environment (ROCm vs. NVIDIA vs. CPU), runs a warmup pass to exclude model-loading time, and reports average latency and throughput per prompt.
 
-**Measured on the dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b):** CPU inference ~1.8 token/s. On Radeon Cloud (RX 7900 / ROCm) with GGUF Q4_K_M and full-layer offload, throughput is projected at a **5–10x improvement**; the final submission includes an AMD comparison table under `benchmarks/`.
+**Estimated on the dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b, CPU inference):** ≈ 1.8 token/s. On Radeon Cloud (RX 7900 / ROCm) with GGUF Q4_K_M and full-layer offload, throughput is projected at a **5–10x improvement**; the measured AMD numbers will be added to `benchmarks/` once the Radeon Cloud benchmark completes.
 
 ---
 

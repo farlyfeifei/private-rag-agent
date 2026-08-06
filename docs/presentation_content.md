@@ -153,10 +153,10 @@ Bullets:
 
 ## Slide 9 — Performance
 
-**Title:** Measured Baseline, Documented Headroom on AMD
+**Title:** Baseline Recorded, Headroom Documented on AMD
 
 Bullets:
-- Baseline measured on dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b): ~1.8 token/s CPU inference.
+- Baseline estimated on dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b, CPU inference): ≈ 1.8 token/s.
 - Radeon Cloud target (RX 7900, ROCm, GGUF Q4_K_M, full-layer GPU offload): projected 5–10x throughput.
 - Benchmarks are automated and reproducible via `benchmarks/bench_amd.py`; final submission includes the AMD-measured table.
 - Metrics tracked per phase: retrieval latency (ms), rerank latency (ms), generation throughput (tokens/s), multi-agent end-to-end wall clock.

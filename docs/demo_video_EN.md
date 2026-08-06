@@ -118,7 +118,7 @@ A small comparison table: `CPU ≈ 1.8 tokens/s → AMD Radeon GPU + ROCm ×5–
 
 **Narration**
 
-> All inference runs on AMD Radeon hardware. Switch to the GPU monitor and you see utilization, memory, and temperature tracking the workload in real time. On Radeon with ROCm, the same model runs five to ten times faster than CPU. That is exactly why the multi-agent pipeline matters — several inferences are queued in parallel and scheduled onto the GPU at once, which collapses the wall-clock time of multi-step research. For precision, Q8_0 at about eight gigabytes of VRAM; for speed, the Q4_K_M quant at about four-point-six — which is our recommended default.
+> All inference runs on AMD Radeon hardware. Switch to the GPU monitor and you see utilization, memory, and temperature tracking the workload in real time. On Radeon with ROCm, the same model is projected to run five to ten times faster than CPU — the measured numbers are in the benchmark section of this submission. That is exactly why the multi-agent pipeline matters — several inferences are queued in parallel and scheduled onto the GPU at once, which collapses the wall-clock time of multi-step research. For precision, Q8_0 at about eight gigabytes of VRAM; for speed, the Q4_K_M quant at about four-point-six — which is our recommended default.
 
 **Production note**
 

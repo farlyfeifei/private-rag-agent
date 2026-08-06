@@ -44,7 +44,7 @@ The system is architected around AMD Radeon GPUs and the ROCm software stack fro
 one. It supports three interchangeable inference backends (Ollama/ROCm, llama.cpp/HIP,
 vLLM/ROCm), runs quantized GGUF models with full-layer GPU offload, and exploits a
 researcher-pool parallelism strategy to saturate GPU throughput — the key lever behind the
-5–10x wall-clock speedup measured versus CPU inference.
+5–10x wall-clock speedup projected versus CPU inference.
 
 ---
 
@@ -214,8 +214,9 @@ user rather than silently presented as fact.
 ### 4.5 Multi-Format Document Import
 Documents are parsed from PDF, Word (.docx), Markdown, Excel (.xlsx), CSV, JSON, PPT
 (.pptx) and plain text, chunked at 512 characters with a 64-character overlap, embedded,
-and stored in ChromaDB. Ingestion is idempotent (content-hash based), and documents can
-be added, listed, or removed through the web UI or CLI.
+and stored in ChromaDB. Ingestion is idempotent (content-hash based); documents can be
+added and listed through the web UI or CLI (`python main.py ingest`), and removed through
+the web UI.
 
 ### 4.6 Live GPU Monitoring
 A dedicated panel polls GPU utilization, VRAM usage, temperature, power draw and core

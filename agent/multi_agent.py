@@ -50,7 +50,7 @@ SYNTHESIZE_PROMPT = """你是一名资深分析师。下面是针对同一问题
 1. 组织清晰：用标题/分点/列表。
 2. 综合而非罗列：把各子报告的信息整合成连贯叙述。
 3. 标注来源（用 [来源:文档名] 格式）。**只引用子报告"来源"字段里真实存在的文档名**（例如 [来源:技术白皮书.md]），不要臆造文件名。
-4. 如果某个子报告被标注为"部分/无证据支撑"，要如实说明该部分可信度有限。
+4. 传给本提示的所有子报告均已通过事实核查；若文末有"未通过核查、已排除"的清单，请在答案最后用一段话如实说明这些方面未获知识库支撑，且不要为它们编造内容。
 5. 最后用一段话总结核心结论。
 请用中文回答。
 """
@@ -237,6 +237,28 @@ class MultiAgentOrchestrator:
                    "flag": verdict.get("flag", "")}
         self.sub_reports = checked
 
+        # 汇总前的核查过滤："汇总只用通过核查的内容"必须是硬保证而非提示词约定。
+        # 无来源（grounding=None）或 groundedness 低于阈值的子报告不进入综合内容，
+        # 只把"被排除"这一事实交给综合器，让最终答案如实披露该方面未获知识库支撑。
+        VERIFIED_FLOOR = 0.25
+        passed, excluded = [], []
+        for r in checked:
+            g = r["verdict"].get("grounding")
+            if g is None:
+                r["verdict"]["excluded"] = "该子任务未检索到可用来源，结论基于模型常识，未通过核查，不进入综合。"
+                excluded.append(r)
+            elif g < VERIFIED_FLOOR:
+                r["verdict"]["excluded"] = (f"该子任务 grounding={g:.2f} 低于核查阈值 "
+                                            f"{VERIFIED_FLOOR}，未通过核查，不进入综合。")
+                excluded.append(r)
+            else:
+                passed.append(r)
+        if not passed:
+            # 极端兜底：全部未通过时仍综合，但强制提示告知内容未获支撑
+            passed, excluded = checked, []
+        self._verified_sub_reports = passed
+        self._excluded_sub_reports = excluded
+
         # 汇总
         yield {"type": "synthesize"}
         sub_reports = "\n\n---\n\n".join(
@@ -244,7 +266,11 @@ class MultiAgentOrchestrator:
             f"[该子问题实际检索到的来源文档: {', '.join(r.get('sources', [])) or '无'}]\n"
             f"[核查: grounding={r['verdict'].get('grounding')} "
             f"引用={r['verdict'].get('cite_precision')}]\n{r['verdict'].get('flag', '')}"
-            for r in checked)
+            for r in passed)
+        if excluded:
+            ex_note = "\n\n[以下子问题未通过事实核查，已从综合内容中排除。请在答案中如实说明这些方面未获知识库支撑，不要臆造：]\n" + \
+                      "\n".join(f"- {r['sub_q']}：{r['verdict'].get('excluded', '')}" for r in excluded)
+            sub_reports += ex_note
         full = ""
         try:
             for ev in self.agent.llm.chat_stream_full([
