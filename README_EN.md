@@ -16,7 +16,7 @@ Private RAG Agent is a **fully offline, locally hosted, private multi-agent RAG 
 - **Multi-agent collaboration** — a Decomposer, parallel Researchers, a Fact-Checker, and a Synthesizer mirror industrial multi-agent RAG architectures.
 - **Traceable and auditable** — hybrid retrieval, cross-encoder reranking, per-sentence groundedness checks, and clickable citations that jump straight to the source text.
 - **Multi-format documents** — PDF, Word, Markdown, Excel, and PowerPoint are all supported.
-- **Professional dark UI** — a custom FastAPI + SSE + native HTML/CSS/JS front end with a live activity timeline, per-sentence verification panel, and a real-time AMD GPU monitoring panel.
+- **Professional dark UI** — a custom FastAPI + SSE + native HTML/CSS/JS front end with a live activity timeline, per-sentence verification panel, and a real-time AMD GPU monitoring panel. **English / 中文 interface switchable from the Settings modal (English by default).**
 
 ---
 

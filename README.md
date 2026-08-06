@@ -178,7 +178,7 @@ private-rag-agent/
 │   └── planner.py      # 任务规划
 ├── ui/
 │   ├── server.py       # FastAPI + SSE 流式接口
-│   └── static/         # 原生 HTML/CSS/JS（专业级暗色界面）
+│   └── static/         # 原生 HTML/CSS/JS（专业级暗色界面，中英文可切换）
 ├── benchmarks/         # AMD ROCm 基准测试
 ├── config.yaml         # 配置（检索/切块/量化参数）
 ├── main.py             # 入口
