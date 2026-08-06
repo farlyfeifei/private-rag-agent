@@ -8,8 +8,8 @@
 | Track Focus | Local deployment of agentic private AI; 40% of score from AMD Radeon GPU / ROCm optimization |
 | Project Name | Private RAG Agent (`private-rag-agent`) |
 | Core Principle | Data never leaves the machine. Chunking, embedding, retrieval, reasoning and verification all run locally. No cloud API dependency at runtime. |
-| Team | __________ |
-| Demo Video | __________ |
+| Team | MENG Yuxuan |
+| Demo Video | [demo_video.md](../submissions/track2-private-rag-agent/demo_video.md) — Bilibili / YouTube (recording) |
 | Submission Deadline | 2026-08-06 23:59 (UTC+8) |
 
 ---
