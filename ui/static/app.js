@@ -509,20 +509,25 @@
       case 'verify':
         addTraceStep('fact_check', { sub: ev.sub_q, grounding: ev.grounding },
                      ev.flag ? 'err' : 'ok', ev.grounding != null ? `g=${ev.grounding}` : '');
-        // 主对话流内也展示核查卡片（"可核查"是本项目核心卖点）
-        if (state.currentMsgEl && ev.grounding != null) {
+        // 主对话流内也展示核查卡片（"可核查"是本项目核心卖点）。
+        // 未通过核查（grounding 为 null 或低于阈值）的子报告标注"已排除"，清晰可见。
+        if (state.currentMsgEl && (ev.grounding != null || ev.excluded)) {
           const vc = document.createElement('div');
-          vc.className = 'verify-card';
+          vc.className = 'verify-card' + (ev.excluded ? ' excluded' : '');
           const g = ev.grounding;
-          const cls = g >= 0.6 ? 'high' : g >= 0.35 ? 'med' : 'low';
-          const label = g >= 0.6 ? '已支撑' : g >= 0.35 ? '部分支撑' : '证据不足';
+          let cls, label;
+          if (ev.excluded) { cls = 'excluded'; label = '未通过核查 · 已排除'; }
+          else if (g >= 0.6) { cls = 'high'; label = '已支撑'; }
+          else if (g >= 0.35) { cls = 'med'; label = '部分支撑'; }
+          else { cls = 'low'; label = '证据不足'; }
           vc.innerHTML = `
             <div class="verify-head">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
               事实核查
             </div>
             <div class="verify-q">${escapeHtml(ev.sub_q)}</div>
-            <div class="verify-result ${cls}">${label} · grounding ${g.toFixed(3)}</div>
+            <div class="verify-result ${cls}">${label}${g != null ? ` · grounding ${g.toFixed(3)}` : ''}</div>
+            ${ev.excluded ? `<div class="verify-flag">${escapeHtml(ev.excluded)}</div>` : ''}
             ${ev.flag ? `<div class="verify-flag">${escapeHtml(ev.flag)}</div>` : ''}`;
           state.currentMsgEl.querySelector('.bubble').appendChild(vc);
         }

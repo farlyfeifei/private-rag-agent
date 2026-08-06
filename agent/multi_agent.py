@@ -70,6 +70,20 @@ JUDGE_PROMPT = """你是事实核查员。下面是一份 AI 子报告及其检�
 只输出 JSON。
 """
 
+# 综合阶段的事实核查阈值：grounding 低于此值（或无来源）的子报告视为"未通过核查"，
+# 不进入综合内容 —— "汇总只用已核查内容"是代码级硬保证，而非提示词约定。
+VERIFIED_FLOOR = 0.25
+
+
+def _exclusion_reason(verdict: dict) -> str:
+    """返回子报告被排除的说明；通过核查则返回空串。"""
+    g = verdict.get("grounding")
+    if g is None:
+        return "该子任务未检索到可用来源，结论基于模型常识，未通过核查。"
+    if g < VERIFIED_FLOOR:
+        return f"该子任务 grounding={g:.2f} 低于核查阈值 {VERIFIED_FLOOR}，未通过核查。"
+    return ""
+
 
 class MultiAgentOrchestrator:
     def __init__(self, agent: Agent, n_workers: int = 3):
@@ -233,23 +247,20 @@ class MultiAgentOrchestrator:
             verdict = self._fact_check(r)
             r["verdict"] = verdict
             checked.append(r)
+            # 实时告知 UI：该子报告是否被排除出综合（"未通过核查"在界面上一眼可见）
+            exclusion = _exclusion_reason(verdict)
             yield {"type": "verify", "sub_q": r["sub_q"], "grounding": verdict["grounding"],
-                   "flag": verdict.get("flag", "")}
+                   "flag": verdict.get("flag", ""), "excluded": exclusion}
         self.sub_reports = checked
 
         # 汇总前的核查过滤："汇总只用通过核查的内容"必须是硬保证而非提示词约定。
         # 无来源（grounding=None）或 groundedness 低于阈值的子报告不进入综合内容，
         # 只把"被排除"这一事实交给综合器，让最终答案如实披露该方面未获知识库支撑。
-        VERIFIED_FLOOR = 0.25
         passed, excluded = [], []
         for r in checked:
-            g = r["verdict"].get("grounding")
-            if g is None:
-                r["verdict"]["excluded"] = "该子任务未检索到可用来源，结论基于模型常识，未通过核查，不进入综合。"
-                excluded.append(r)
-            elif g < VERIFIED_FLOOR:
-                r["verdict"]["excluded"] = (f"该子任务 grounding={g:.2f} 低于核查阈值 "
-                                            f"{VERIFIED_FLOOR}，未通过核查，不进入综合。")
+            reason = _exclusion_reason(r["verdict"])
+            if reason:
+                r["verdict"]["excluded"] = reason + " 不进入综合。"
                 excluded.append(r)
             else:
                 passed.append(r)
