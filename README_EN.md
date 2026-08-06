@@ -64,6 +64,14 @@ python main.py ingest data/docs/   # batch-import the docs directory
 python main.py ui                  # open http://localhost:7860
 ```
 
+**Three ways to add documents (in the Knowledge Base sidebar):**
+1. **Import docs** — select individual files (PDF / Word / Markdown / Excel / PPT).
+2. **Scan folder** — pick a local folder; all documents inside are ingested at once.
+3. **Read all** — scan this machine for supported documents (PDF / DOCX / MD / CSV / XLSX / PPTX),
+   skipping cache, dependency, system and browser-data directories, and ingest them.
+
+The agent only ever searches the documents you have ingested — it never scans your whole disk otherwise.
+
 Other CLI entry points: `python main.py ask "question"` (CLI Q&A) and `python main.py bench` (AMD GPU benchmark).
 
 ### Docker (one-command containerized deployment)
