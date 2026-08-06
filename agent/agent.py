@@ -92,10 +92,11 @@ class Agent:
         return any(k.lower() in m for k in COMPLEX_KEYWORDS)
 
     # ------------------------------------------------------------ 核心循环
-    def _run_loop_events(self, messages: list, emit: bool = True):
+    def _run_loop_events(self, messages: list, emit: bool = True, tools_enabled: bool = True):
         """单遍流式工具循环。
 
         流式产出 delta（emit=True 时），工具调用在流结尾拿到完整列表并执行。
+        tools_enabled=False 时走"纯问答"（不触发工具，直接回答）。
         Returns: 本轮循环生成的完整文本。
         """
         final_text = ""
@@ -103,7 +104,8 @@ class Agent:
         for step in range(self.max_steps):
             tool_calls = []
             step_text = ""
-            stream = self.llm.chat_stream_full(messages, tools=self.tools.schemas())
+            stream = self.llm.chat_stream_full(messages,
+                                               tools=self.tools.schemas() if tools_enabled else None)
             for ev in stream:
                 if ev["tool_calls"]:
                     tool_calls = ev["tool_calls"]
@@ -147,8 +149,11 @@ class Agent:
         print(f"    [tool] {name}({json.dumps(args, ensure_ascii=False)}) -> {str(result)[:80]}...")
 
     # ------------------------------------------------------------------
-    def ask_events(self, user_msg: str, use_planning: bool = True):
-        """富事件流（UI 主用）。"""
+    def ask_events(self, user_msg: str, use_planning: bool = True, tools_enabled: bool = True):
+        """富事件流（UI 主用）。
+
+        tools_enabled=False 时纯问答（不触发工具调用、不规划），用于"工具调用"开关。
+        """
         self.trace = []
         self.plan = []
         self.verification = None
@@ -159,9 +164,9 @@ class Agent:
         messages += self.memory.short_messages()[:-1]
         messages.append({"role": "user", "content": user_msg})
 
-        # ---- 规划阶段（仅复杂问题）----
+        # ---- 规划阶段（仅复杂问题且启用工具时）----
         plan = []
-        if use_planning and self._looks_complex(user_msg):
+        if use_planning and tools_enabled and self._looks_complex(user_msg):
             try:
                 plan = self.planner.plan(user_msg)
             except Exception as e:
@@ -186,7 +191,7 @@ class Agent:
                         f"然后直接给出这一步的结论（不超过300字）。"},
                 ]
                 txt = ""
-                for ev in self._run_loop_events(step_msg, emit=False):
+                for ev in self._run_loop_events(step_msg, emit=False, tools_enabled=tools_enabled):
                     txt += ev["text"] if ev["type"] == "delta" else ""
                 step_results.append(f"【步骤{i}】{task}\n{txt.strip()}")
                 yield {"type": "plan_step_done", "step": i, "task": task}
@@ -195,13 +200,13 @@ class Agent:
             synth_msg = [{"role": "system", "content": SYNTHESIZE_PLAN_PROMPT.format(
                 goal=user_msg, steps="\n\n".join(step_results))},
                 {"role": "user", "content": "请给出综合结论。"}]
-            for ev in self._run_loop_events(synth_msg, emit=True):
+            for ev in self._run_loop_events(synth_msg, emit=True, tools_enabled=tools_enabled):
                 if ev["type"] == "delta":
                     final_text += ev["text"]
                 yield ev
         else:
             # 直接问答
-            for ev in self._run_loop_events(messages, emit=True):
+            for ev in self._run_loop_events(messages, emit=True, tools_enabled=tools_enabled):
                 if ev["type"] == "delta":
                     final_text += ev["text"]
                 yield ev

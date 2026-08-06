@@ -448,16 +448,17 @@ benchmark harness:
 
 ### 8.2 Expected Results on AMD Radeon GPU / ROCm
 
-The table below is the committed benchmark target, to be filled with measured results on
-Radeon Cloud (RX 7900-class / ROCm) ahead of submission. Expected speedup: **5–10x** over
-the CPU baseline.
+The table below reports the measured CPU baseline and the projected AMD targets. The
+AMD rows will be updated with measured Radeon Cloud numbers once the benchmark notebook
+(`tools/rc/rc_benchmark.ipynb`) is run on the cloud instance; the projection is **5–10x**
+over the CPU baseline. A CPU measurement artifact is included in the repo.
 
-| Config | Tokens/s (measured) | First-token latency | VRAM | Notes |
+| Config | Tokens/s | First-token latency | VRAM | Notes |
 |---|---|---|---|---|
-| CPU (baseline, dev) | ~1.8 | — | — | reference point |
-| RX 7900 / ROCm, GGUF Q4_K_M, full offload | **[fill in]** | **[fill in]** | ~4.6 GB | balanced default |
-| RX 7900 / ROCm, GGUF Q8_0, full offload | **[fill in]** | **[fill in]** | ~8.2 GB | quality mode |
-| Radeon Cloud, vLLM | **[fill in]** | **[fill in]** | — | high concurrency |
+| CPU baseline (dev, qwen3:8b) | 0.2–11 (measured) | — | — | reference point; `benchmarks/results/bench_local_20260806.txt` |
+| RX 7900 / ROCm, GGUF Q4_K_M, full offload | projected 5–10x | expected sub-second | ~4.6 GB | balanced default |
+| RX 7900 / ROCm, GGUF Q8_0, full offload | projected 5–10x | expected sub-second | ~8.2 GB | quality mode |
+| Radeon Cloud, vLLM | projected 5–10x | expected sub-second | — | high concurrency |
 
 Command to reproduce:
 ```bash

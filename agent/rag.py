@@ -214,28 +214,30 @@ class RAGStore:
             return hashlib.md5(f.read()).hexdigest()
 
     def add_document(self, path: str) -> int:
-        """解析 + 切片 + embedding 入库。返回 chunk 数（幂等）。"""
+        """解析 + 切片 + embedding 入库。返回 chunk 数（幂等）。
+
+        性能关键：解析与 embedding（最耗时，走 Ollama）在 _RETRIEVE_LOCK 外执行，
+        这样导入大文件时不会阻塞并发的检索 / 前端轮询；只有最终校验幂等与
+        collection.add（触碰 ChromaDB 原生资源）才持锁。
+        """
+        path = os.path.abspath(path)
+        if not os.path.exists(path):
+            raise FileNotFoundError(path)
+        text = read_document(path)
+        if not text:
+            _log(f"[warn] {path} 解析出空文本")
+            return 0
+        chunks = chunk_text(text, CHUNK, OVERLAP)
+        doc_id = self._doc_hash(path)
+        # 锁外预计算 embedding（耗时部分并发进行）
+        embs = [self.llm.embed(c) for c in chunks]
+        metadatas = [{"doc": os.path.basename(path), "chunk": i} for i in range(len(chunks))]
+        ids = [f"{doc_id}#{i}" for i in range(len(chunks))]
         with _RETRIEVE_LOCK:
-            path = os.path.abspath(path)
-            if not os.path.exists(path):
-                raise FileNotFoundError(path)
-            text = read_document(path)
-            if not text:
-                _log(f"[warn] {path} 解析出空文本")
-                return 0
-            chunks = chunk_text(text, CHUNK, OVERLAP)
-            doc_id = self._doc_hash(path)
-            existing = self.collection.get(ids=[doc_id])["ids"]
-            if existing:
+            if self.collection.get(ids=[doc_id])["ids"]:
                 _log(f"[skip] {os.path.basename(path)} 已入库")
                 return 0
-            metadatas, docs, ids, embs = [], [], [], []
-            for i, c in enumerate(chunks):
-                embs.append(self.llm.embed(c))
-                metadatas.append({"doc": os.path.basename(path), "chunk": i})
-                docs.append(c)
-                ids.append(f"{doc_id}#{i}")
-            self.collection.add(ids=ids, documents=docs, metadatas=metadatas,
+            self.collection.add(ids=ids, documents=chunks, metadatas=metadatas,
                                 embeddings=embs)
             # 失效缓存（corpus / bm25 需要重建）
             self._corpus = None
@@ -321,17 +323,26 @@ class RAGStore:
         return out
 
     # --------------------------------------------------------------- 检索
+    def _prep_queries(self, query: str) -> List[str]:
+        """查询改写在锁外执行：LLM 调用最耗时，多 Agent 研究者应并发改写，
+        而不是在 _RETRIEVE_LOCK 内串行排队（违背"推理并发、检索只串行毫秒级"的设计）。"""
+        try:
+            return self._expand_query(query) if QUERY_EXPANSION else [query]
+        except Exception:
+            return [query]
+
     def search(self, query: str, top_k: int = TOP_K) -> List[Tuple[str, str, float]]:
         """混合检索 -> [(text, source, score)]。
 
-        管线：查询改写（可选）→ 向量∪BM25 → RRF 融合 → 近重复去重 →
+        管线：查询改写（可选，锁外并发）→ 向量∪BM25 → RRF 融合 → 近重复去重 →
         cross-encoder 重排 → 自适应候选池 → 上下文压缩。
         返回结构保持 (text, source, score) 不变（压缩对调用方透明）。
         任何环节降级都不会中断（纯向量是保底）。
         """
+        queries = self._prep_queries(query)
         # 串行化共享原生资源（ChromaDB/hnsw、cross-encoder），见 _RETRIEVE_LOCK 注释
         with _RETRIEVE_LOCK:
-            return self._search_unlocked(query, top_k)
+            return self._search_unlocked(query, top_k, queries)
 
     def search_with_meta(self, query: str, top_k: int = TOP_K) -> Tuple[List[Tuple[str, str, float]], dict]:
         """混合检索 + 检索元信息 -> (results, meta)。
@@ -340,18 +351,25 @@ class RAGStore:
                 sources: [文档名去重]}。
         confidence = min(top_score, 1)。同样在 _RETRIEVE_LOCK 内完成。
         """
+        queries = self._prep_queries(query)
         with _RETRIEVE_LOCK:
-            results, meta = self._search_with_meta_unlocked(query, top_k)
+            results, meta = self._search_with_meta_unlocked(query, top_k, queries)
             self.last_meta = meta
             return results, meta
 
-    def _search_unlocked(self, query: str, top_k: int = TOP_K) -> List[Tuple[str, str, float]]:
-        results, _ = self._search_with_meta_unlocked(query, top_k)
+    def _search_unlocked(self, query: str, top_k: int = TOP_K,
+                         queries: Optional[List[str]] = None) -> List[Tuple[str, str, float]]:
+        results, _ = self._search_with_meta_unlocked(query, top_k, queries)
         return results
 
-    def _search_with_meta_unlocked(self, query: str, top_k: int = TOP_K):
-        """完整检索管线（必须在 _RETRIEVE_LOCK 内调用，共享原生资源串行化）。"""
-        queries = self._expand_query(query) if QUERY_EXPANSION else [query]
+    def _search_with_meta_unlocked(self, query: str, top_k: int = TOP_K,
+                                   queries: Optional[List[str]] = None):
+        """完整检索管线（必须在 _RETRIEVE_LOCK 内调用，共享原生资源串行化）。
+
+        查询改写结果由调用方在锁外计算好传入（LLM 调用并发进行，不占用锁）。
+        """
+        if queries is None:
+            queries = [query]
 
         # 1. 各检索源打分
         vec_hits: dict = {}     # cid -> {"rank":..., "score":...}

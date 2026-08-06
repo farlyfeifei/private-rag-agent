@@ -108,6 +108,7 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
     mode: str = "single"          # single | multi
     n_workers: int = 3
+    tools_enabled: bool = True    # 工具调用开关（false = 纯问答，不触发工具）
 
 
 @app.get("/")
@@ -126,7 +127,7 @@ async def api_chat(req: ChatRequest):
         orch = MultiAgentOrchestrator(agent, n_workers=req.n_workers)
         _stream_bridge(orch.run_events(req.message, n=req.n_workers), q, loop)
     else:
-        _stream_bridge(agent.ask_events(req.message), q, loop)
+        _stream_bridge(agent.ask_events(req.message, tools_enabled=req.tools_enabled), q, loop)
 
     async def event_gen():
         while True:
@@ -290,18 +291,24 @@ def api_ingest_dir():
 
 @app.post("/api/ingest_path")
 def api_ingest_path(payload: dict = Body(...)):
-    """把用户指定的本地目录下的受支持文档导入知识库。
+    """把指定路径下的文档导入知识库（支持目录或单个文件）。
 
-    用途：让用户决定"检索哪些本地内容"——输入一个文件夹路径，
-    只把这些文件收进知识库，搜索范围严格限定在已导入的文档内。
+    用途：让用户决定"检索哪些本地内容"——输入一个文件夹/文件路径，
+    只把这些内容收进知识库，搜索范围严格限定在已导入的文档内。
+    相对路径按 docs 目录解析（供"待导入"列表的单文件点击使用）。
     """
     llm, rag, _ = _get_shared()
     path = (payload.get("path") or "").strip().strip('"').strip("'")
     if not path:
-        raise HTTPException(400, "目录路径不能为空")
-    if not os.path.isdir(path):
-        raise HTTPException(400, f"目录不存在或不可读: {path}")
-    n = rag.index_dir(path)
+        raise HTTPException(400, "路径不能为空")
+    if not os.path.isabs(path):
+        path = os.path.join(DOCS_DIR, path)
+    if os.path.isdir(path):
+        n = rag.index_dir(path)
+    elif os.path.isfile(path):
+        n = rag.add_document(path)
+    else:
+        raise HTTPException(400, f"路径不存在或不可读: {path}")
     return {"ok": True, "total_chunks": n, "path": path}
 
 
@@ -326,6 +333,22 @@ def api_clear_session(sid: str):
     if sid in SESSIONS:
         SESSIONS[sid]["agent"].memory.clear_short()
     return {"ok": True}
+
+
+@app.delete("/api/sessions/{sid}")
+def api_delete_session(sid: str):
+    """真实删除会话：从内存移除，侧栏不再残留。"""
+    SESSIONS.pop(sid, None)
+    return {"ok": True}
+
+
+@app.get("/api/sessions/{sid}/history")
+def api_session_history(sid: str):
+    """返回会话的短程对话历史（供切换会话时恢复界面）。"""
+    if sid not in SESSIONS:
+        raise HTTPException(404, "会话不存在")
+    msgs = SESSIONS[sid]["agent"].memory.short_messages()
+    return {"session_id": sid, "messages": msgs}
 
 
 # ----------------------------------------------------------------- GPU

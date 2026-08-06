@@ -26,9 +26,12 @@ class Planner:
             {"role": "system", "content": PLAN_PROMPT},
             {"role": "user", "content": f"目标：{goal}"},
         ], temperature=0.1, max_tokens=800)
-        text = resp["content"]
+        text = resp["content"].strip()
+        # 剥掉 ```json 代码围栏（不能用 replace('json','')——会误伤含"json"的子任务文本）
+        import re as _re
+        m = _re.search(r"\{.*\}", text, _re.S)
         try:
-            data = json.loads(text.strip().strip("`").replace("json", ""))
+            data = json.loads(m.group(0)) if m else json.loads(text)
             return data.get("plan", [])
         except Exception:
             return []

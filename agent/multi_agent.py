@@ -123,7 +123,9 @@ class MultiAgentOrchestrator:
         try:
             subs = json.loads(m.group(0))
             subs = self._normalize_subs(subs)
-            return [str(s) for s in subs if str(s).strip()][:n]
+            parsed = [str(s) for s in subs if str(s).strip()][:n]
+            # 模型可能输出空数组 / 全空串（小模型常见）：退回原问题，避免线程池崩溃
+            return parsed or [question]
         except Exception:
             return [question]
 
@@ -198,12 +200,15 @@ class MultiAgentOrchestrator:
                     "flag": "（该子任务未检索到来源，结论基于模型常识，可信度有限）"}
         g_score, sents = groundedness(answer, self._resolve_sources(sources))
         cite_p, cites = verify_citations(answer, set(sources))
-        # LLM-as-judge：逐 claim 判定（best-effort，失败不影响主流程）
+        # LLM-as-judge：逐 claim 判定（best-effort，失败不影响主流程）。
+        # 关键：必须喂"证据原文"而非文件名，否则 judge 的 supported/unsupported
+        # 判定只是模型空谈，无法支撑"逐事实陈述核查"的严谨性主张。
         flag = ""
         try:
+            evidence = "\n\n".join(self._resolve_sources(sources))[:3000]
             judge = self.agent.llm.chat([
                 {"role": "system", "content": JUDGE_PROMPT.format(
-                    answer=answer[:1800], sources="\n\n".join(sources)[:2500])},
+                    answer=answer[:1800], sources=evidence)},
                 {"role": "user", "content": "请核查。"},
             ], temperature=0.1, max_tokens=900)
             jtext = judge["content"].strip().strip("`")
@@ -248,7 +253,8 @@ class MultiAgentOrchestrator:
         from collections import deque
         live: deque = deque()
         reports = [None] * self.sub_count
-        with ThreadPoolExecutor(max_workers=min(self.n_workers, self.sub_count)) as pool:
+        workers = max(1, min(self.n_workers, self.sub_count))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
             pending = {pool.submit(self._run_researcher, q, live.append): i
                        for i, q in enumerate(subs)}
             done = 0

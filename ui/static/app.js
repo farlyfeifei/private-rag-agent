@@ -11,11 +11,12 @@
     mode: 'single',
     toolsEnabled: true,
     busy: false,
+    streaming: false,         // 是否正在流式生成（键盘快捷键守卫用）
     history: [],           // [{role, content(html), text, citations, verification}]
     trace: [],             // 当前消息的工具步骤
     currentMsgEl: null,    // 正在流式渲染的 assistant 消息气泡
     currentMsgText: '',
-    currentCiteSeen: new Set(),
+    currentCiteSeen: new Map(),
     planSteps: [],
     subCount: 0,
     lastQuery: '',          // 用户原始问题
@@ -138,7 +139,7 @@
       'gpu.demoNote': '<b>Demo data</b> — no AMD GPU detected. Real rocm-smi metrics appear on Radeon Cloud.',
       'gpu.sourceNote': 'Source: {src} · refresh 2s',
       'modal.backend': 'Backend', 'modal.model': 'Model', 'modal.url': 'Service URL',
-      'modal.retrieval': 'Retrieval', 'modal.hybrid': 'BM25 + vector', 'modal.vector': 'vector only',
+      'modal.retrieval': 'Retrieval', 'modal.retrievalType': 'Type', 'modal.hybrid': 'BM25 + vector', 'modal.vector': 'vector only',
       'modal.rerank': 'Rerank', 'modal.embedding': 'Embedding',
       'modal.kb': 'Knowledge base', 'modal.docs': 'Docs', 'modal.chunks': 'Chunks', 'modal.dir': 'Directory',
       'modal.gpu': 'AMD GPU', 'modal.status': 'Status', 'modal.connected': 'Connected',
@@ -249,7 +250,7 @@
       'gpu.demoNote': '<b>演示数据</b> — 本机未检测到 AMD GPU。部署到 Radeon Cloud 后显示真实 rocm-smi 指标。',
       'gpu.sourceNote': '来源：{src} · 实时刷新 2s',
       'modal.backend': '后端', 'modal.model': '模型', 'modal.url': '服务地址',
-      'modal.retrieval': '检索', 'modal.hybrid': 'BM25 + 向量', 'modal.vector': '纯向量',
+      'modal.retrieval': '检索', 'modal.retrievalType': '方式', 'modal.hybrid': 'BM25 + 向量', 'modal.vector': '纯向量',
       'modal.rerank': '重排', 'modal.embedding': 'Embedding',
       'modal.kb': '知识库', 'modal.docs': '文档', 'modal.chunks': '片段', 'modal.dir': '目录',
       'modal.gpu': 'AMD GPU', 'modal.status': '状态', 'modal.connected': '已连接',
@@ -535,6 +536,13 @@
     if (!verification) return '';
     const g = verification.grounding;
     let level = 'low', label = t('trust.unknown');
+    if (g == null) {
+      // 无可校验内容（多 Agent 全无来源等）→ 显示"待确认"，绝不渲染 NaN%
+      if (verification.excluded_count > 0) {
+        label = t('verify.excluded') + t('trust.excluded', { n: verification.excluded_count });
+      }
+      return `<div class="trust-pill low">${t('trust.unknown')}</div>`;
+    }
     if (g >= 0.6) { level = 'high'; label = t('trust.supported', { p: Math.round(g * 100) }); }
     else if (g >= 0.35) { level = 'med'; label = t('trust.partial', { p: Math.round(g * 100) }); }
     else { level = 'low'; label = t('trust.unsupported', { p: Math.round(g * 100) }); }
@@ -658,16 +666,15 @@
   async function sendMessage() {
     const text = input.value.trim();
     if (!text || state.busy) return;
-    if (!state.toolsEnabled) {
-      // 关闭工具时仍走服务端，但事件里工具照常（服务端暂不支持停用），这里直接走完整流
-    }
     state.busy = true;
+    state.streaming = true;
     sendBtn.disabled = true;
     input.value = '';
     autoGrow();
 
     appendUserMsg(text);
     state.lastQuery = text;   // 供来源抽屉高亮
+    state.lastSearchQuery = '';  // 重置，避免旧消息的检索词污染来源抽屉高亮
     state.currentMsgEl = appendAssistantMsg();
     state.currentMsgText = '';
     state.trace = [];
@@ -675,7 +682,7 @@
     traceList.innerHTML = '';
     traceEmpty.classList.remove('hidden');
     // 清理当前消息的旧引用区（等 done 事件统一渲染）
-    state.currentCiteSeen = new Set();
+    state.currentCiteSeen = new Map();
 
     // 取消上一个
     if (state.abortCtrl) state.abortCtrl.abort();
@@ -691,6 +698,7 @@
           session_id: state.sessionId,
           mode: state.mode,
           n_workers: 3,
+          tools_enabled: state.toolsEnabled,
         }),
         signal: state.abortCtrl.signal,
       });
@@ -726,6 +734,7 @@
       }
     } finally {
       state.busy = false;
+      state.streaming = false;
       sendBtn.disabled = false;
       input.focus();
     }
@@ -762,7 +771,6 @@
         }
         if (state.currentMsgEl && state.currentMsgEl._subStatus && ev.progress) {
           const [d, t] = ev.progress.split('/');
-          state.currentMsgEl._subStatus.querySelector('em').textContent = t('status.subtasks', { n: t });
           state.currentMsgEl._subStatus.querySelector('.status-text').innerHTML =
             t('status.done', { d: d, t: t });
         }
@@ -824,9 +832,11 @@
           const re = /\[来源[:：]?\s*([^\]\[]+?)\]/g;
           let m;
           while ((m = re.exec(ev.result)) !== null) {
-            let name = m[1].trim().split(/[\s，。；,;（）(]/)[0];
+            const raw = m[1].trim();
+            const sc = raw.match(/相关度[:：]?\s*([\d.]+)/);
+            const name = raw.split(/[\s，。；,;（）(]/)[0];
             if (name && !state.currentCiteSeen.has(name)) {
-              state.currentCiteSeen.add(name);
+              state.currentCiteSeen.set(name, sc ? parseFloat(sc[1]) : 0.6);
             }
           }
         }
@@ -851,7 +861,7 @@
           md.innerHTML = renderMarkdown(state.currentMsgText);
           // 从最终文本提取引用
           const cites = extractCitations(state.currentMsgText);
-          const sources = [...state.currentCiteSeen].map(doc => ({ doc, score: 0.8 }));
+          const sources = [...state.currentCiteSeen].map(([doc, score]) => ({ doc, score }));
           // 并进去重（名称统一清洗）
           const seen = new Set(sources.map(s => s.doc));
           cites.forEach(c => {
@@ -915,7 +925,8 @@
   async function loadSessions() {
     try {
       const data = await api('/api/sessions');
-      renderSessions(data.sessions || []);
+      SESSIONS_CACHE = data.sessions || [];
+      renderSessions(SESSIONS_CACHE);
     } catch (e) {}
   }
   function renderSessions(sessions) {
@@ -944,9 +955,16 @@
     });
   }
   async function switchSession(sid) {
+    // 先中断在途的 SSE 请求，避免旧会话事件污染新会话
+    if (state.abortCtrl) { try { state.abortCtrl.abort(); } catch (e) {} }
+    state.abortCtrl = new AbortController();
+    state.busy = false;
+    sendBtn.disabled = false;
+    state.currentMsgText = '';
     state.sessionId = sid;
     state.history = [];
     state.currentMsgEl = null;
+    state.currentCiteSeen = new Map();
     chatList.innerHTML = '';
     emptyState.classList.remove('hidden');
     traceList.innerHTML = '';
@@ -954,23 +972,47 @@
     // 标题
     const found = SESSIONS_CACHE.find(s => s.id === sid);
     sessionTitle.textContent = found && found.title !== '新会话' ? found.title : t('session.new');
+    // 恢复历史（若存在）
+    try {
+      const h = await api(`/api/sessions/${encodeURIComponent(sid)}/history`);
+      const msgs = h.messages || [];
+      if (msgs.length) {
+        emptyState.classList.add('hidden');
+        msgs.forEach(m => {
+          if (!m || !m.content) return;
+          if (m.role === 'user') {
+            appendUserMsg(String(m.content));
+          } else {
+            const el = appendAssistantMsg();
+            const md = el.querySelector('.md.stream');
+            if (md) md.innerHTML = renderMarkdown(String(m.content));
+            el.classList.remove('streaming');
+          }
+        });
+      }
+    } catch (e) {}
     loadSessions();
   }
   let SESSIONS_CACHE = [];
   async function newSession() {
-    const data = await api('/api/sessions', { method: 'POST' });
-    await switchSession(data.session_id);
+    try {
+      const data = await api('/api/sessions', { method: 'POST' });
+      await switchSession(data.session_id);
+    } catch (e) {
+      toast(t('err.request', { msg: e.message }), true);
+    }
   }
   async function deleteSession(sid) {
-    // 当前简化：直接删除本地会话对象（后端内存），重建
     try {
-      await api(`/api/sessions/${sid}/clear`, { method: 'POST' });
+      await api(`/api/sessions/${encodeURIComponent(sid)}`, { method: 'DELETE' });
       if (sid === state.sessionId) {
         await newSession();
       } else {
         loadSessions();
       }
-    } catch (e) {}
+    } catch (e) {
+      toast(t('err.request', { msg: e.message }), true);
+    }
   }
   $('new-chat-btn').addEventListener('click', newSession);
 
@@ -1025,14 +1067,20 @@
     if (data.error) kbStats.textContent = '⚠ ' + data.error;
   }
   async function ingestFileFromDir(fname) {
-    // 对已存在于 docs 目录但未入库的文件，通过后端 ingest_dir 无法单独指定；
-    // 简化：用 fetch 到 /api/ingest 需要文件体，改用专用接口
+    // 对已存在于 docs 目录但未入库的文件，单独导入该文件（而不是重扫整个目录）
+    if (!fname) { toast(t('err.unknown'), true); return; }
     try {
-      const resp = await fetch('/api/ingest_dir', { method: 'POST' });
+      const resp = await fetch('/api/ingest_path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: fname }),
+      });
       const data = await resp.json();
       if (data.ok) {
-        toast(t('kb.scanDone', { n: data.total_chunks }));
+        toast(t('kb.ingested', { file: fname, n: data.total_chunks }));
         loadKB();
+      } else {
+        toast(data.detail || 'error', true);
       }
     } catch (e) { toast(t('kb.scanFail', { msg: e.message }), true); }
   }
@@ -1050,8 +1098,8 @@
       try {
         const resp = await fetch('/api/ingest', { method: 'POST', body: fd });
         const data = await resp.json();
-        if (data.ok) toast(t('kb.ingested', { file: data.file, n: data.chunks }));
-        else toast(t('kb.ingestFail', { file: data.file, msg: data.note || '' }), true);
+        if (data.ok) toast(t('kb.ingested', { file: data.file || f.name, n: data.chunks || 0 }));
+        else toast(t('kb.ingestFail', { file: data.file || f.name, msg: data.note || data.detail || 'error' }), true);
       } catch (e) {
         toast(t('kb.uploadFail', { file: f.name, msg: e.message }), true);
       }
@@ -1099,7 +1147,19 @@
   /* ---------- GPU 监控 ---------- */
   const gpuCtx = gpuChart.getContext('2d');
   let gpuChartInit = false;
+  function sizeGpuCanvas() {
+    // 把 canvas 后备存储对齐到显示尺寸 × devicePixelRatio，避免图表被拉伸失真
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, gpuChart.clientWidth || 300);
+    const h = Math.max(1, gpuChart.clientHeight || 140);
+    if (gpuChart.width !== Math.round(w * dpr) || gpuChart.height !== Math.round(h * dpr)) {
+      gpuChart.width = Math.round(w * dpr);
+      gpuChart.height = Math.round(h * dpr);
+      gpuCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
   function drawGpuChart() {
+    sizeGpuCanvas();
     if (gpuHistory.length < 2) {
       // 画空网格
       gpuCtx.clearRect(0, 0, gpuChart.width, gpuChart.height);
@@ -1147,8 +1207,10 @@
       const g = data.gpus && data.gpus[0];
       if (g) {
         const util = Math.round(g.utilization || 0);
-        const vramPct = Math.round(g.vram_util_pct != null ? g.vram_util_pct :
-          (g.vram_used_mb / Math.max(1, g.vram_total_mb)) * 100);
+        let vramPct = 0;
+        if (g.vram_util_pct != null) vramPct = Math.round(g.vram_util_pct);
+        else if (g.vram_used_mb != null && g.vram_total_mb != null)
+          vramPct = Math.round((g.vram_used_mb / Math.max(1, g.vram_total_mb)) * 100);
         const temp = g.temperature != null ? Math.round(g.temperature) : null;
         const power = g.power_w != null ? Math.round(g.power_w) : null;
         const clock = g.core_clock != null ? Math.round(g.core_clock) : null;
@@ -1230,7 +1292,7 @@
         </div>
         <div class="hi-block">
           <div class="hi-label">${t('modal.retrieval')}</div>
-          ${fmt(t('modal.hybrid'), d.rag.hybrid ? (LANG === 'zh' ? 'BM25 + 向量' : 'BM25 + vector') : t('modal.vector'))}${fmt(t('modal.rerank'), d.rag.rerank ? 'on' : 'off')}${fmt(t('modal.embedding'), d.embedding)}
+          ${fmt(t('modal.retrievalType'), d.rag.hybrid ? (LANG === 'zh' ? 'BM25 + 向量' : 'BM25 + vector') : t('modal.vector'))}${fmt(t('modal.rerank'), d.rag.rerank ? 'on' : 'off')}${fmt(t('modal.embedding'), d.embedding)}
         </div>
         <div class="hi-block">
           <div class="hi-label">${t('modal.kb')}</div>
@@ -1251,28 +1313,36 @@
   });
 
   /* ---------- 建议示例 ---------- */
-  function runSuggestion(q) {
+  function runSuggestion(q, kind) {
     input.value = q;
     autoGrow();
-    // 复杂问题自动切多 Agent 并行模式（分解→研究→核查→汇总）
-    if (/分析|总结|解读|全景|盘点|评估|比较|怎么|如何/.test(q)) {
+    // 复杂问题自动切多 Agent 并行模式（分解→研究→核查→汇总）。
+    // 按建议卡的 kind（1 项目全景 / 3 架构解读 = 复杂）判定，而非扫描问题文字——
+    // 英文界面下问题仍是中文（面向中文知识库），中文正则会失效。
+    const multiKinds = new Set(['1', '3']);
+    if (multiKinds.has(String(kind))) {
       const mb = $('mode-switch').querySelector('.mode-btn[data-mode="multi"]');
       $('mode-switch').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
       mb.classList.add('active');
       state.mode = 'multi';
+    } else {
+      const sb = $('mode-switch').querySelector('.mode-btn[data-mode="single"]');
+      $('mode-switch').querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      if (sb) sb.classList.add('active');
+      state.mode = 'single';
     }
     sendMessage();
   }
   const suggestionBtns = [...document.querySelectorAll('.suggestion')];
   suggestionBtns.forEach(btn => {
-    btn.addEventListener('click', () => runSuggestion(btn.dataset.q));
+    btn.addEventListener('click', () => runSuggestion(btn.dataset.q, btn.dataset.k));
   });
   // 键盘快捷键 1-4 触发建议（空状态且未在输入时）
   window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || document.activeElement === input) return;
     if (state.streaming || !emptyState || emptyState.classList.contains('hidden')) return;
     const idx = '1234'.indexOf(e.key);
-    if (idx >= 0 && suggestionBtns[idx]) runSuggestion(suggestionBtns[idx].dataset.q);
+    if (idx >= 0 && suggestionBtns[idx]) runSuggestion(suggestionBtns[idx].dataset.q, suggestionBtns[idx].dataset.k);
   });
 
   /* ---------- 滚动 ---------- */

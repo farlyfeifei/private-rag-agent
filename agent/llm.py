@@ -42,7 +42,14 @@ class LLMBackend:
             self._check_ollama()
         elif self.backend == "llama_cpp":
             from llama_cpp import Llama
-            self._llama = Llama(model_path=name, n_gpu_layers=-1, verbose=False)
+            # AMD ROCm 路径：需要真实 GGUF 文件路径（config: model.model_path）。
+            # 注意：不能把 Ollama 标签（如 qwen3:8b）当 model_path 传给 Llama()。
+            model_path = CFG["model"].get("model_path") or name
+            if not model_path or os.path.splitext(model_path)[1].lower() not in (".gguf", ".bin"):
+                raise ValueError(
+                    "llama_cpp 后端需要真实的 GGUF 模型路径（config.yaml 的 model.model_path），"
+                    f"当前为 {model_path!r}。AMD 示例：Qwen2.5-7B-Instruct-Q4_K_M.gguf")
+            self._llama = Llama(model_path=model_path, n_gpu_layers=-1, verbose=False)
         elif self.backend in ("openai_compat", "vllm"):
             from openai import OpenAI
             self._client = OpenAI(base_url=self.base_url, api_key="EMPTY")
@@ -88,14 +95,27 @@ class LLMBackend:
             resp = self._ollama.chat(**kwargs)
             msg = resp["message"]
             result["content"] = msg.get("content") or ""
+            # 暴露真实 token 计数（供基准测试精确计算吞吐）
+            result["_eval_count"] = resp.get("eval_count")
+            result["_prompt_eval_count"] = resp.get("prompt_eval_count")
             for tc in msg.get("tool_calls", []) or []:
                 result["tool_calls"].append({
                     "name": tc["function"]["name"],
                     "arguments": tc["function"]["arguments"],
                 })
         elif self.backend == "llama_cpp":
-            resp = self._llama.create_chat_completion(messages=messages)
-            result["content"] = resp["choices"][0]["message"]["content"]
+            kwargs = dict(messages=messages)
+            if tools:
+                kwargs["tools"] = [{"type": "function", "function": t["function"]} for t in tools]
+                kwargs["tool_choice"] = "auto"
+            resp = self._llama.create_chat_completion(**kwargs)
+            msg = resp["choices"][0]["message"]
+            result["content"] = msg.get("content") or ""
+            for tc in (msg.get("tool_calls") or []):
+                result["tool_calls"].append({
+                    "name": tc["function"]["name"],
+                    "arguments": tc["function"].get("arguments") or "",
+                })
         elif self.backend in ("openai_compat", "vllm"):
             tools_arg = None
             if tools:
@@ -110,6 +130,7 @@ class LLMBackend:
             )
             msg = resp.choices[0].message
             result["content"] = msg.content or ""
+            result["_eval_count"] = getattr(resp, "usage", None) and resp.usage.completion_tokens
             for tc in (msg.tool_calls or []):
                 result["tool_calls"].append({
                     "name": tc.function.name,
@@ -211,7 +232,7 @@ class LLMBackend:
                     i = tc.index
                     _buf[i] = _buf.get(i, "") + (tc.function.arguments or "")
                     _id[i] = tc.id or _id.get(i, "")
-                    _name[i] = (tc.function.name or "") + _name.get(i, "")
+                    _name[i] = _name.get(i, "") + (tc.function.name or "")  # 追加，避免分片颠倒
                 yield {"delta": piece, "tool_calls": []}
             # 结尾解析完整工具调用
             if _buf:
@@ -224,8 +245,8 @@ class LLMBackend:
                     acc_tool_calls.append({"name": _name.get(i, ""), "arguments": args})
                 yield {"delta": "", "tool_calls": acc_tool_calls}
             return
-        # llama_cpp / 其它：降级为非流式
-        r = self.chat(messages)
+        # llama_cpp / 其它：降级为非流式（保留 tools 以支持 RAG 工具调用）
+        r = self.chat(messages, tools=tools)
         yield {"delta": r["content"], "tool_calls": r.get("tool_calls", [])}
 
     def embed(self, text: str) -> list:
@@ -235,6 +256,9 @@ class LLMBackend:
         - ollama: 用独立 embedding 模型（如 bge-m3）
         - sentence_transformers: 本地 HF 模型（RC 无 ollama 时用，走 CPU）
         - openai_compat / vllm: vLLM 需同时加载 embedding 模型
+
+        当模型后端是 llama_cpp / vllm（没有 ollama 客户端）而 embedding 仍配置为
+        ollama 时，自动回退到 sentence_transformers，避免 AttributeError 崩溃。
         """
         emb_cfg = CFG.get("embedding", {})
         emb_backend = emb_cfg.get("backend", "ollama")
@@ -248,13 +272,27 @@ class LLMBackend:
                 self._st_model = model
             return model.encode(text, normalize_embeddings=True).tolist()
         if emb_backend == "ollama":
+            if not hasattr(self, "_ollama"):
+                # 模型后端是 llama_cpp/vllm（无 ollama 客户端）→ 回退本地 embedding
+                return self._embed_st_fallback(text, emb_name)
             resp = self._ollama.embeddings(model=emb_name, prompt=text)
             return resp["embedding"]
         if emb_backend in ("openai_compat", "vllm"):
+            if not hasattr(self, "_client"):
+                return self._embed_st_fallback(text, emb_name)
             resp = self._client.embeddings.create(model=emb_name, input=text)
             return resp.data[0].embedding
         raise NotImplementedError(
             f"embedding backend {emb_backend} 未实现，可用: ollama / sentence_transformers / vllm")
+
+    def _embed_st_fallback(self, text: str, model_name: str) -> list:
+        """无 ollama/vllm 客户端时的本地 embedding 兜底（sentence_transformers）。"""
+        from sentence_transformers import SentenceTransformer
+        model = getattr(self, "_st_model", None)
+        if model is None:
+            model = SentenceTransformer(model_name)
+            self._st_model = model
+        return model.encode(text, normalize_embeddings=True).tolist()
 
 
 if __name__ == "__main__":

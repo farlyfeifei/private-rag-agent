@@ -64,7 +64,12 @@ def bench(llm: LLMBackend, query: str, repeat: int = 3):
         t0 = time.time()
         resp = llm.chat([{"role": "user", "content": query}], max_tokens=256)
         dt = time.time() - t0
-        n_tokens = max(len(resp["content"]) // 2, 1)  # 中文近似 2 字/token
+        # 优先用后端真实 eval token 数（Ollama eval_count / vLLM usage.completion_tokens）；
+        # 拿不到时退化为按字符估算（中文约 1 字符/token，英文约 4 字符/token）
+        if resp.get("_eval_count"):
+            n_tokens = int(resp["_eval_count"])
+        else:
+            n_tokens = max(int(len(resp["content"]) / 1.6), 1)
         tokens.append(n_tokens)
         times.append(dt)
     avg_tps = sum(n / dt for n, dt in zip(tokens, times)) / repeat

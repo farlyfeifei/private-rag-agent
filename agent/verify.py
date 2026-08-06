@@ -102,8 +102,9 @@ def verify_citations(answer: str, retrieved_sources: set) -> Tuple[float, List[d
     """
     cites = extract_citations(answer)
     if not cites:
-        # 无引用：若回答是基于知识库的，标记为需人工确认；整体不算 0
-        return 1.0, [{"cite": "(无引用)", "grounded": True, "note": "回答未引用来源"}]
+        # 无引用：不算"100% 有据"（那是虚报）；返回 None 表示"无可校验引用"，
+        # UI 端显示"未引用来源"而非绿色满分。
+        return None, [{"cite": "(无引用)", "grounded": None, "note": "回答未引用来源"}]
     checks = []
     ok = 0
     for c in cites:

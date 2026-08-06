@@ -437,8 +437,8 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .sv-badge.ok { color: var(--success); }
 .sv-badge.partial { color: var(--warning); }
 .sv-badge.no { color: var(--danger); }
-.sv-text { flex: 1; color: var(--text-2); line-height: 1.6; word-break: break-word; }
-.sv-score { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); margin-top: 1px; }
+.sv-text { flex: 1; color: var(--text-secondary); line-height: 1.6; word-break: break-word; }
+.sv-score { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
 
 /* 流式光标 */
 .type-cursor { display: inline-block; width: 7px; height: 15px; margin-left: 2px; vertical-align: -2px; background: var(--accent); border-radius: 1px; animation: blink 1.06s steps(2, start) infinite; }
