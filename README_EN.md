@@ -168,6 +168,9 @@ query rewriting (LLM, optional)
 - **BM25** — `rank_bm25` with a Chinese-aware tokenizer (2-gram sliding window for CJK, word tokens for English). This catches exact matches for proper nouns and abbreviations that pure vector search misses.
 - **RRF fusion** — Reciprocal Rank Fusion merges the two ranked lists with configurable weights (BM25 0.4, vector 0.6).
 - **Cross-encoder rerank** — `bge-reranker-v2-m3` jointly scores each (query, document) pair, which is the single highest-leverage precision improvement in RAG; the candidate pool is 16 chunks before reranking, cut to `top_k` (default 4) after.
+- **Near-duplicate dedup** — chunks that are >95% character-identical are dropped before reranking, so redundant context never reaches the model.
+- **Adaptive candidate pool** — after reranking, weakly-scored filler (below `max(0.5 × top_score, 0.15)`) is trimmed so the answer is built only from genuinely relevant evidence.
+- **Contextual compression** — each retrieved chunk is reduced to its query-relevant sentences (deterministic character 3-gram overlap), giving the LLM tighter context and better focus. A retrieval **confidence** signal (`search_with_meta`) accompanies every result.
 - **Chunking** — 512 characters with 64-character overlap, applied by the multi-format parser (PDF / DOCX / MD / XLSX / PPTX / TXT / CSV / JSON).
 - **Graceful degradation** — any stage can fail or be disabled without breaking the pipeline; pure vector search is the fallback floor.
 

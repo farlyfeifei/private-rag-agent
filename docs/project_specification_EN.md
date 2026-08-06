@@ -197,6 +197,15 @@ Two retrieval signals are fused for recall and precision:
    pairs and reorders the fused candidate pool (default 16 → top 4). Cross-encoder
    relevance is markedly more accurate than bi-encoder distance and is the single
    highest-leverage point for RAG precision.
+6. **Near-duplicate dedup** — chunks >95% character-identical are dropped before
+   reranking so redundant context never reaches the model.
+7. **Adaptive candidate pool** — weakly-scored filler below `max(0.5 × top_score, 0.15)`
+   is trimmed after reranking, so the answer is grounded only in genuinely relevant
+   evidence rather than diluted by padding.
+8. **Contextual compression** — each returned chunk is reduced to its query-relevant
+   sentences (deterministic character 3-gram overlap against the query), giving the LLM
+   tighter, more focused context at lower token cost. A retrieval **confidence** signal
+   (0–1) is attached to every search result for downstream honesty checks.
 
 The entire pipeline is local and offline; every stage degrades gracefully (pure vector
 search is the guaranteed fallback).

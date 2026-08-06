@@ -78,14 +78,17 @@ docker exec -it private-rag-ollama ollama pull bge-m3
 │  ├── Memory        多轮 + 长期记忆                              │
 │  └── Tools         rag_search / read_doc / list_docs 工具        │
 ├──────────────────────────────────────────────────────────────┤
-│  RAG 检索管线（混合检索 + 重排）                                 │
+│  RAG 检索管线（混合检索 + 重排 + 压缩）                          │
 │  ├── parser.py     PDF/Word/MD/Excel/PPT 解析                  │
 │  ├── chunk_text    智能切片（512 字符 + 64 重叠）               │
 │  ├── 查询改写       LLM 生成同义检索词                           │
 │  ├── 向量检索        ChromaDB（bge-m3, cosine）                │
 │  ├── BM25           关键词精确召回（专有名词/缩写）              │
 │  ├── RRF 融合        Reciprocal Rank Fusion                   │
-│  └── cross-encoder  bge-reranker-v2-m3 重排（Top-k 精度）       │
+│  ├── cross-encoder  bge-reranker-v2-m3 重排（Top-k 精度）       │
+│  ├── 近重复去重      >95% 字符级相同片段剔除                     │
+│  ├── 自适应候选池    弱分填充剔除（只留真正相关的证据）            │
+│  └── 上下文压缩      每片段裁剪到与查询相关的句子（更聚焦）         │
 ├──────────────────────────────────────────────────────────────┤
 │  可信度验证                                                     │
 │  ├── groundedness   回答句子 vs 检索原文 3-gram 重叠             │
