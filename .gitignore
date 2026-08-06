@@ -34,3 +34,5 @@ _docs_check.json
 .vscode/
 submissions/
 demo/video_frames/
+demo/frames/
+demo/narration/
