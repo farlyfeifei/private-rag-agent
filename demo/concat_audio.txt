@@ -1,0 +1,12 @@
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot1.mp3'
+silence
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot2.mp3'
+silence
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot3.mp3'
+silence
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot4.mp3'
+silence
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot5.mp3'
+silence
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\narration\shot6.mp3'
+silence

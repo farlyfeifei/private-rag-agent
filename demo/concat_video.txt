@@ -1,0 +1,6 @@
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot1.mp4'
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot2.mp4'
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot3.mp4'
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot4.mp4'
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot5.mp4'
+file 'C:\Users\Administrator\Desktop\AMD黑客松\private-rag-agent\demo\seg_shot6.mp4'
