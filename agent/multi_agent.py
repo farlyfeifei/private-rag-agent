@@ -264,11 +264,17 @@ class MultiAgentOrchestrator:
                 excluded.append(r)
             else:
                 passed.append(r)
+        fallback_all_excluded = False
         if not passed:
-            # 极端兜底：全部未通过时仍综合，但强制提示告知内容未获支撑
-            passed, excluded = checked, []
+            # 极端兜底：全部未通过时仍综合（否则无答案），但必须把"未获支撑"这一事实
+            # 原样交给综合器，让它如实披露而非装作内容可靠。
+            passed = checked
+            fallback_all_excluded = True
+            for r in excluded:
+                r["verdict"]["excluded"] = _exclusion_reason(r["verdict"]) + " 该子任务内容可信度有限，请如实披露。"
         self._verified_sub_reports = passed
         self._excluded_sub_reports = excluded
+        self._fallback_all_excluded = fallback_all_excluded
 
         # 汇总
         yield {"type": "synthesize"}
@@ -279,8 +285,12 @@ class MultiAgentOrchestrator:
             f"引用={r['verdict'].get('cite_precision')}]\n{r['verdict'].get('flag', '')}"
             for r in passed)
         if excluded:
-            ex_note = "\n\n[以下子问题未通过事实核查，已从综合内容中排除。请在答案中如实说明这些方面未获知识库支撑，不要臆造：]\n" + \
-                      "\n".join(f"- {r['sub_q']}：{r['verdict'].get('excluded', '')}" for r in excluded)
+            ex_note = ("\n\n[以下子问题未通过事实核查"
+                       + ("，已从综合内容中排除。请在答案中如实说明这些方面未获知识库支撑，不要臆造：]"
+                          if not fallback_all_excluded else
+                          "。它们被纳入仅为兜底，内容基于模型常识、可信度有限。请在答案中如实披露：]")
+                       + "\n" + "\n".join(f"- {r['sub_q']}：{r['verdict'].get('excluded', '')}"
+                                          for r in excluded))
             sub_reports += ex_note
         full = ""
         try:
