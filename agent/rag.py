@@ -378,15 +378,20 @@ class RAGStore:
         if RERANK and len(cand) >= 2:
             cand, reranked = self._rerank(query, cand)
 
-        # 5. 自适应候选池：剔除重排分过弱的填充，不让弱结果稀释上下文
+        # 5. 自适应候选池：剔除重排分过弱的填充，不让弱结果稀释上下文。
+        #    只在检索置信度高（top_score >= 0.5）时才收紧，且始终保底 2 条证据——
+        #    弱检索时保留全部 top_k，避免证据不足导致 Agent 误判"知识库无此内容"。
         if ADAPTIVE_TOP_K and reranked and cand:
             try:
                 top_score = max(s for _, _, s in cand)
-                thr = max(0.5 * top_score, 0.15)
-                kept = [c for c in cand if c[2] >= thr]
-                if not kept:          # 全弱分（如全负 logits）时保底最强一条
-                    kept = cand[:1]
-                cand = kept
+                if top_score >= 0.5:
+                    thr = max(0.5 * top_score, 0.15)
+                    kept = [c for c in cand if c[2] >= thr]
+                    if not kept:          # 全弱分（如全负 logits）时保底最强一条
+                        kept = cand[:1]
+                    if len(kept) < 2 and len(cand) >= 2:
+                        kept = sorted(cand, key=lambda c: -c[2])[:2]
+                    cand = kept
             except Exception as e:
                 _log(f"[warn] adaptive top-k failed: {e}")
 
