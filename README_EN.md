@@ -237,7 +237,7 @@ python benchmarks/bench_amd.py # auto-detect platform and report tokens/s
 
 The benchmark (`benchmarks/bench_amd.py`) detects the environment (ROCm vs. NVIDIA vs. CPU), runs a warmup pass to exclude model-loading time, and reports average latency and throughput per prompt.
 
-**Estimated on the dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b, CPU inference):** ≈ 1.8 token/s. On Radeon Cloud (RX 7900 / ROCm) with GGUF Q4_K_M and full-layer offload, throughput is projected at a **5–10x improvement**; the measured AMD numbers will be added to `benchmarks/` once the Radeon Cloud benchmark completes.
+**Estimated on the dev machine (NVIDIA RTX 4070 Laptop, Ollama qwen3:8b, CPU inference):** 0.2–11 token/s depending on output length (measurement artifact: `benchmarks/results/bench_local_20260806.txt`). On Radeon Cloud (RX 7900 / ROCm) with GGUF Q4_K_M and full-layer offload, throughput is projected at a **5–10x improvement**; the measured AMD numbers will be added to `benchmarks/` once the Radeon Cloud benchmark completes.
 
 ---
 

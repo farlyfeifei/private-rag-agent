@@ -153,7 +153,8 @@ ollama ps                 # 确认模型 100% GPU 加载
 python benchmarks/bench_amd.py   # 自动检测并输出 tokens/s
 ```
 
-**开发机估算（NVIDIA RTX 4070 Laptop，Ollama qwen3:8b，CPU 推理）：** 约 1.8 token/s。
+**开发机估算（NVIDIA RTX 4070 Laptop，Ollama qwen3:8b，CPU 推理）：** 0.2~11 token/s
+（视输出长度波动，实测工件见 `benchmarks/results/bench_local_20260806.txt`）。
 切换到 Radeon Cloud（RX 7900 / ROCm）后，GGUF Q4_K_M + 全层 GPU offload
 预计吞吐提升 **5~10 倍**，正式提交的 `benchmarks/` 会补上实测对比数据。
 
