@@ -41,6 +41,254 @@
   const gpuChart = $('gpu-chart');
   const gpuNote = $('gpu-note');
 
+  /* ---------- 国际化（默认英文，可在设置切换中文） ---------- */
+  const I18N = {
+    en: {
+      'brand': 'Private RAG',
+      'session.new': 'New session',
+      'session.none': 'No sessions yet',
+      'mode.toast': 'Multi-Agent: decompose → research → fact-check → synthesize',
+      'gpu.badgeTitle': 'AMD GPU live status',
+      'gpu.demoChip': 'Demo',
+      'settings.title': 'System info',
+      'chat.new': 'New chat',
+      'kb.label': 'Knowledge base',
+      'kb.import': 'Import docs',
+      'kb.importTitle': 'Import documents (PDF/Word/Markdown/Excel/PPT)',
+      'kb.scan': 'Scan folder',
+      'kb.scanTitle': 'Ingest all pending docs in the docs directory',
+      'kb.privacy': '100% local · works offline',
+      'empty.title': 'Local Private Agent',
+      'empty.sub1': 'Search your knowledge base for traceable answers.',
+      'empty.sub2': 'Fully local inference — data never leaves this machine.',
+      'sug1.title': 'Project overview', 'sug1.sub': 'Stack · AMD optimization · deploy',
+      'sug2.title': 'Summarize doc', 'sug2.sub': 'Grounded in the knowledge base',
+      'sug3.title': 'Architecture', 'sug3.sub': 'Inference / retrieval / memory',
+      'sug4.title': 'Browse KB', 'sug4.sub': 'list_docs tool',
+      'input.placeholder': 'Ask my knowledge base, e.g. what stack does my project use?',
+      'mode.title': 'Inference mode',
+      'mode.single': 'Single Agent',
+      'mode.multi': 'Multi-Agent',
+      'mode.parallel': 'Parallel',
+      'tools.label': 'Tool calls',
+      'send.title': 'Send (Enter)',
+      'hint.enter': 'Enter to send',
+      'hint.shift': 'Shift+Enter for newline',
+      'hint.cite': 'Answers include citations',
+      'tab.trace': 'Activity',
+      'tab.gpu': 'GPU Monitor',
+      'trace.empty1': 'After you send a question, every',
+      'trace.empty2': 'agent action appears here in real time.',
+      'modal.title': 'System info',
+      'modal.loading': 'Loading…',
+      'drawer.doc': 'Document',
+      'drawer.loading': 'Loading source…',
+      'tb.param': 'Args',
+      'tb.result': 'Result',
+      'tb.running': 'Running',
+      'tb.fail': 'Failed',
+      'tb.error': 'Error',
+      'trust.unknown': 'Confidence pending',
+      'trust.supported': 'Supported · evidence {p}%',
+      'trust.partial': 'Partially supported · {p}%',
+      'trust.unsupported': 'Unsupported · {p}%',
+      'trust.confLabel': ' · confidence {c}',
+      'trust.conf.high': 'high',
+      'trust.conf.medium': 'medium',
+      'trust.conf.low': 'low',
+      'trust.excluded': ' · {n} sub-task(s) failed verification',
+      'cite.head': 'Sources',
+      'drawer.chars': '{n} chars · local KB',
+      'drawer.truncated': ' (truncated)',
+      'err.readDoc': 'Cannot read document: {msg}',
+      'err.request': 'Request failed: {msg}',
+      'err.service': 'Service error: {msg}',
+      'err.unknown': 'unknown',
+      'status.parallel': 'Running <em>{n}</em> sub-tasks in parallel…',
+      'status.subtasks': '{n} sub-tasks',
+      'status.done': 'Completed <em>{d}/{t}</em> sub-tasks…',
+      'status.synth': 'Synthesizing <em>{n}</em> sub-reports…',
+      'trace.research': 'Research · {name}',
+      'kb.delete': 'Delete',
+      'kb.removeTitle': 'Remove from knowledge base',
+      'kb.removeConfirm': 'Remove {doc} from the knowledge base?',
+      'kb.deleted': 'Deleted {doc}',
+      'kb.deleteFail': 'Delete failed: {msg}',
+      'kb.pending': 'Pending',
+      'kb.toIngest': 'Import',
+      'kb.empty': 'Knowledge base is empty — click "Import docs" to add documents',
+      'kb.count': '{d} docs · {c} chunks',
+      'kb.scanDone': 'Scan complete — {n} chunks ingested',
+      'kb.scanFail': 'Scan failed: {msg}',
+      'kb.ingested': '{file} → {n} chunks ingested',
+      'kb.ingestFail': '{file}: {msg}',
+      'kb.uploadFail': 'Upload of {file} failed: {msg}',
+      'gpu.name': 'GPU name',
+      'gpu.util': 'Utilization',
+      'gpu.vram': 'VRAM',
+      'gpu.temp': 'Temperature',
+      'gpu.power': 'Power',
+      'gpu.clock': 'Clock',
+      'gpu.demoNote': '<b>Demo data</b> — no AMD GPU detected. Real rocm-smi metrics appear on Radeon Cloud.',
+      'gpu.sourceNote': 'Source: {src} · refresh 2s',
+      'modal.backend': 'Backend', 'modal.model': 'Model', 'modal.url': 'Service URL',
+      'modal.retrieval': 'Retrieval', 'modal.hybrid': 'BM25 + vector', 'modal.vector': 'vector only',
+      'modal.rerank': 'Rerank', 'modal.embedding': 'Embedding',
+      'modal.kb': 'Knowledge base', 'modal.docs': 'Docs', 'modal.chunks': 'Chunks', 'modal.dir': 'Directory',
+      'modal.gpu': 'AMD GPU', 'modal.status': 'Status', 'modal.connected': 'Connected',
+      'modal.notDetected': 'Not detected', 'modal.time': 'Server time',
+      'verify.head': 'Fact check',
+      'verify.supported': 'Supported', 'verify.partial': 'Partially supported', 'verify.unsupported': 'Unsupported',
+      'verify.excluded': 'Failed · excluded',
+      'excl.no_sources': 'No retrievable sources for this sub-task; the conclusion relies on model knowledge.',
+      'excl.low_grounding': 'Grounding {g} below the verification threshold — excluded from synthesis.',
+      'sent.supported': 'Supported', 'sent.partial': 'Partial', 'sent.unsupported': 'Unsupported',
+      'sv.toggle': 'Sentence verification',
+      'lang.label': 'Language',
+      'lang.en': 'English',
+      'lang.zh': '中文',
+    },
+    zh: {
+      'brand': 'Private RAG',
+      'session.new': '新会话',
+      'session.none': '暂无历史会话',
+      'mode.toast': '多 Agent 并行：分解 → 研究 → 核查 → 汇总',
+      'gpu.badgeTitle': 'AMD GPU 实时状态',
+      'gpu.demoChip': '演示',
+      'settings.title': '系统信息',
+      'chat.new': '新建会话',
+      'kb.label': '知识库',
+      'kb.import': '导入文档',
+      'kb.importTitle': '导入文档（PDF/Word/Markdown/Excel/PPT）',
+      'kb.scan': '扫描目录',
+      'kb.scanTitle': '导入 docs 目录下所有待导入文档',
+      'kb.privacy': '数据 100% 本地 · 断网可用',
+      'empty.title': '本地私有智能体',
+      'empty.sub1': '检索你的知识库，生成可追溯的回答。',
+      'empty.sub2': '全程本地推理，数据不出本机。',
+      'sug1.title': '项目全景', 'sug1.sub': '技术栈 · AMD 优化 · 部署',
+      'sug2.title': '总结文档', 'sug2.sub': '基于知识库内容归纳',
+      'sug3.title': '架构解读', 'sug3.sub': '推理 / 检索 / 记忆链路',
+      'sug4.title': '盘点知识库', 'sug4.sub': 'list_docs 工具',
+      'input.placeholder': '问我的知识库，例如：我的项目用了什么技术栈？',
+      'mode.title': '推理模式',
+      'mode.single': '单 Agent',
+      'mode.multi': '多 Agent',
+      'mode.parallel': '并行',
+      'tools.label': '工具调用',
+      'send.title': '发送 (Enter)',
+      'hint.enter': 'Enter 发送',
+      'hint.shift': 'Shift+Enter 换行',
+      'hint.cite': '回答自动附引用来源',
+      'tab.trace': '运行轨迹',
+      'tab.gpu': 'GPU 监控',
+      'trace.empty1': '发送问题后，这里会实时显示',
+      'trace.empty2': 'Agent 的每一步动作。',
+      'modal.title': '系统信息',
+      'modal.loading': '加载中…',
+      'drawer.doc': '文档',
+      'drawer.loading': '加载原文…',
+      'tb.param': '参数',
+      'tb.result': '结果',
+      'tb.running': '运行中',
+      'tb.fail': '失败',
+      'tb.error': '错误',
+      'trust.unknown': '可信度待确认',
+      'trust.supported': '已支撑 · 证据强度 {p}%',
+      'trust.partial': '部分支撑 · {p}%',
+      'trust.unsupported': '证据不足 · {p}%',
+      'trust.confLabel': ' · 置信度{c}',
+      'trust.conf.high': '高',
+      'trust.conf.medium': '中',
+      'trust.conf.low': '低',
+      'trust.excluded': ' · {n} 个子任务未通过核查',
+      'cite.head': '引用来源',
+      'drawer.chars': '{n} 字符 · 本地知识库',
+      'drawer.truncated': '（已截断）',
+      'err.readDoc': '无法读取文档：{msg}',
+      'err.request': '请求失败：{msg}',
+      'err.service': '服务错误：{msg}',
+      'err.unknown': '未知',
+      'status.parallel': '并行执行 <em>{n}</em> 个子任务…',
+      'status.subtasks': '{n} 个子任务',
+      'status.done': '已完成 <em>{d}/{t}</em> 个子任务…',
+      'status.synth': '正在综合 <em>{n}</em> 份子报告…',
+      'trace.research': '研究 · {name}',
+      'kb.delete': '删除',
+      'kb.removeTitle': '从知识库删除',
+      'kb.removeConfirm': '从知识库删除 {doc}？',
+      'kb.deleted': '已删除 {doc}',
+      'kb.deleteFail': '删除失败：{msg}',
+      'kb.pending': '待导入',
+      'kb.toIngest': '待入库',
+      'kb.empty': '知识库为空，点击"导入文档"添加',
+      'kb.count': '{d} 份文档 · {c} 片段',
+      'kb.scanDone': '扫描目录完成，共入库 {n} 片段',
+      'kb.scanFail': '扫描失败：{msg}',
+      'kb.ingested': '{file} → {n} 片段已入库',
+      'kb.ingestFail': '{file}：{msg}',
+      'kb.uploadFail': '{file} 上传失败：{msg}',
+      'gpu.name': 'GPU 名称',
+      'gpu.util': '利用率',
+      'gpu.vram': '显存占用',
+      'gpu.temp': '温度',
+      'gpu.power': '功耗',
+      'gpu.clock': '核心时钟',
+      'gpu.demoNote': '<b>演示数据</b> — 本机未检测到 AMD GPU。部署到 Radeon Cloud 后显示真实 rocm-smi 指标。',
+      'gpu.sourceNote': '来源：{src} · 实时刷新 2s',
+      'modal.backend': '后端', 'modal.model': '模型', 'modal.url': '服务地址',
+      'modal.retrieval': '检索', 'modal.hybrid': 'BM25 + 向量', 'modal.vector': '纯向量',
+      'modal.rerank': '重排', 'modal.embedding': 'Embedding',
+      'modal.kb': '知识库', 'modal.docs': '文档', 'modal.chunks': '片段', 'modal.dir': '目录',
+      'modal.gpu': 'AMD GPU', 'modal.status': '状态', 'modal.connected': '已连接',
+      'modal.notDetected': '未检测到', 'modal.time': '服务器时间',
+      'verify.head': '事实核查',
+      'verify.supported': '已支撑', 'verify.partial': '部分支撑', 'verify.unsupported': '证据不足',
+      'verify.excluded': '未通过核查 · 已排除',
+      'excl.no_sources': '该子任务未检索到可用来源，结论基于模型常识。',
+      'excl.low_grounding': 'grounding {g} 低于核查阈值，未通过核查。',
+      'sent.supported': '已支撑', 'sent.partial': '部分支撑', 'sent.unsupported': '无支撑',
+      'sv.toggle': '逐句校验',
+      'lang.label': '语言',
+      'lang.en': 'English',
+      'lang.zh': '中文',
+    },
+  };
+  let LANG = 'en';
+  try { LANG = localStorage.getItem('privrag_lang') || 'en'; } catch (e) {}
+  const DICT = I18N[LANG] || I18N.en;
+  function t(key, vars) {
+    let s = DICT[key] !== undefined ? DICT[key] : (I18N.en[key] !== undefined ? I18N.en[key] : key);
+    if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+    return s;
+  }
+  function applyI18n() {
+    // 静态文案（data-i18n 属性）
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      el.textContent = t(key);
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+    });
+    document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+    document.title = LANG === 'zh' ? 'Private RAG Agent · 本地私有智能体' : 'Private RAG Agent · Local Private Agent';
+    // 语言选择器状态
+    const sel = document.getElementById('lang-select');
+    if (sel) sel.value = LANG;
+    // 动态面板重新渲染（GPU 标签等）
+    if (typeof refreshGpu === 'function') refreshGpu();
+    if (typeof loadSessions === 'function') loadSessions();
+  }
+  function setLang(lang) {
+    LANG = lang === 'zh' ? 'zh' : 'en';
+    try { localStorage.setItem('privrag_lang', LANG); } catch (e) {}
+    location.reload();
+  }
+
   /* ---------- 工具函数 ---------- */
   function escapeHtml(s) {
     return (s || '').replace(/[&<>"']/g, c => ({
@@ -154,7 +402,7 @@
     const el = document.createElement('div');
     el.className = 'msg user';
     el.innerHTML = `
-      <div class="avatar">我</div>
+      <div class="avatar">${LANG === 'zh' ? '我' : 'You'}</div>
       <div class="bubble">${escapeHtml(text)}</div>`;
     chatList.appendChild(el);
     scrollBottom();
@@ -198,15 +446,15 @@
         <span class="tool-name">${escapeHtml(name)}</span>
         <span class="tool-status">
           ${status === 'running'
-            ? '<span class="st-running"></span><span class="tool-dur">运行中</span>'
+            ? '<span class="st-running"></span><span class="tool-dur">' + t('tb.running') + '</span>'
             : status === 'ok'
               ? '<span class="dot st-ok"></span><span class="tool-dur">' + (dur || '') + '</span>'
-              : '<span class="dot st-err"></span><span class="tool-dur">失败</span>'}
+              : '<span class="dot st-err"></span><span class="tool-dur">' + t('tb.fail') + '</span>'}
         </span>
       </div>
       <div class="tool-step-body">
-        ${argsJson ? `<div class="tb-label">参数</div><pre>${argsJson}</pre>` : ''}
-        <div class="tb-label">结果</div>
+        ${argsJson ? `<div class="tb-label">${t('tb.param')}</div><pre>${argsJson}</pre>` : ''}
+        <div class="tb-label">${t('tb.result')}</div>
         <pre class="tb-result">${escapeHtml(resultPreview(status))}</pre>
       </div>`;
     card.querySelector('.tool-step-head').addEventListener('click', () => {
@@ -218,7 +466,7 @@
 
     function resultPreview(st) {
       if (st === 'running') return '…';
-      if (st === 'err') return '执行出错';
+      if (st === 'err') return t('tb.error');
       return '';
     }
     return card;
@@ -274,18 +522,18 @@
   function trustPill(verification) {
     if (!verification) return '';
     const g = verification.grounding;
-    let level = 'low', label = '可信度待确认';
-    if (g >= 0.6) { level = 'high'; label = `已支撑 · 证据强度 ${Math.round(g * 100)}%`; }
-    else if (g >= 0.35) { level = 'med'; label = `部分支撑 · ${Math.round(g * 100)}%`; }
-    else { level = 'low'; label = `证据不足 · ${Math.round(g * 100)}%`; }
+    let level = 'low', label = t('trust.unknown');
+    if (g >= 0.6) { level = 'high'; label = t('trust.supported', { p: Math.round(g * 100) }); }
+    else if (g >= 0.35) { level = 'med'; label = t('trust.partial', { p: Math.round(g * 100) }); }
+    else { level = 'low'; label = t('trust.unsupported', { p: Math.round(g * 100) }); }
     // 多 Agent 模式附带的整体置信度分类与排除计数（后端 done 事件新增字段）
     const conf = verification.confidence;
     if (conf && g != null) {
-      const map = { high: '高', medium: '中', low: '低' };
-      if (map[conf]) label += ` · 置信度${map[conf]}`;
+      const map = { high: t('trust.conf.high'), medium: t('trust.conf.medium'), low: t('trust.conf.low') };
+      if (map[conf]) label += t('trust.confLabel', { c: map[conf] });
     }
     if (verification.excluded_count > 0) {
-      label += ` · ${verification.excluded_count} 个子任务未通过核查`;
+      label += t('trust.excluded', { n: verification.excluded_count });
     }
     const icons = {
       high: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
@@ -302,14 +550,14 @@
     let ok = 0, partial = 0, no = 0;
     const items = sents.map(s => {
       const lv = s.level || '';
-      const cls = lv === '已支撑' ? 'ok' : lv === '部分支撑' ? 'partial' : 'no';
+      const cls = lv === 'supported' ? 'ok' : lv === 'partial' ? 'partial' : 'no';
       if (cls === 'ok') ok++;
       else if (cls === 'partial') partial++;
       else no++;
       const mark = cls === 'ok' ? '✓' : cls === 'partial' ? '△' : '✗';
       const pct = Math.round((s.support || 0) * 100);
       return `<div class="sv-item">
-        <span class="sv-badge ${cls}">${mark}</span>
+        <span class="sv-badge ${cls}" title="${cls === 'ok' ? t('sent.supported') : cls === 'partial' ? t('sent.partial') : t('sent.unsupported')}">${mark}</span>
         <span class="sv-text">${escapeHtml(s.text)}</span>
         <span class="sv-score">${pct}%</span>
       </div>`;
@@ -320,7 +568,7 @@
       <button class="sv-toggle" type="button">
         <span style="display:flex;align-items:center;gap:7px">
           <svg class="sv-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-          逐句校验
+          ${t('sv.toggle')}
         </span>
         <span class="sv-count"><span class="ok">✓ ${ok}</span><span class="partial">△ ${partial}</span><span class="no">✗ ${no}</span></span>
       </button>
@@ -347,7 +595,7 @@
     }).join('');
     const el = document.createElement('div');
     el.className = 'citations';
-    el.innerHTML = `<div class="cite-head">引用来源</div>${chips}`;
+    el.innerHTML = `<div class="cite-head">${t('cite.head')}</div>${chips}`;
     el.querySelectorAll('.cite-chip').forEach(chip => {
       chip.addEventListener('click', () => openDocDrawer(chip.dataset.doc));
     });
@@ -359,12 +607,13 @@
     const mask = $('doc-drawer-mask');
     const body = $('drawer-body');
     $('drawer-doc-name').textContent = doc;
-    $('drawer-doc-meta').textContent = '正在读取原文…';
-    body.innerHTML = '<div class="drawer-loading">加载原文…</div>';
+    $('drawer-doc-meta').textContent = t('drawer.loading');
+    body.innerHTML = '<div class="drawer-loading">' + t('drawer.loading') + '</div>';
     mask.classList.remove('hidden');
     try {
       const data = await api(`/api/documents/${encodeURIComponent(doc)}?limit=6000`);
-      $('drawer-doc-meta').textContent = `${data.chars} 字符${data.truncated ? '（已截断）' : ''} · 本地知识库`;
+      $('drawer-doc-meta').textContent = t('drawer.chars', { n: data.chars })
+        + (data.truncated ? t('drawer.truncated') : '') + ' · ' + (LANG === 'zh' ? '本地知识库' : 'local KB');
       // 高亮：用「查询 2-gram ∩ 文档」重叠定位相关区间（与 BM25 检索同套 tokenization）。
       // 任意问法都能标出文档里语义相关的段落，而不是要求整句逐字匹配。
       const docText = data.content;
@@ -383,9 +632,9 @@
       } else {
         content = escapeHtml(docText);
       }
-      body.innerHTML = content || '<div class="drawer-loading">（文档内容为空）</div>';
+      body.innerHTML = content || '<div class="drawer-loading">' + t('drawer.loading') + '</div>';
     } catch (e) {
-      body.innerHTML = `<div class="msg-error">无法读取文档：${escapeHtml(e.message)}</div>`;
+      body.innerHTML = `<div class="msg-error">${escapeHtml(t('err.readDoc', { msg: e.message }))}</div>`;
     }
   }
   $('drawer-close').addEventListener('click', () => $('doc-drawer-mask').classList.add('hidden'));
@@ -458,9 +707,9 @@
       if (e.name !== 'AbortError') {
         if (state.currentMsgEl) {
           state.currentMsgEl.querySelector('.md.stream').innerHTML =
-            `<div class="msg-error">请求失败：${escapeHtml(e.message)}</div>`;
+            `<div class="msg-error">${escapeHtml(t('err.request', { msg: e.message }))}</div>`;
         } else {
-          toast('请求失败：' + e.message, true);
+          toast(t('err.request', { msg: e.message }), true);
         }
       }
     } finally {
@@ -484,7 +733,7 @@
           if (state.planSteps.length > 2) {
             state.currentMsgEl._subStatus = document.createElement('div');
             state.currentMsgEl._subStatus.className = 'status-row';
-            state.currentMsgEl._subStatus.innerHTML = `<span class="status-spinner"></span><span class="status-text">并行执行 <em>${state.planSteps.length}</em> 个子任务…</span>`;
+            state.currentMsgEl._subStatus.innerHTML = `<span class="status-spinner"></span><span class="status-text">${t('status.parallel', { n: state.planSteps.length })}</span>`;
             state.currentMsgEl.querySelector('.bubble').appendChild(state.currentMsgEl._subStatus);
           }
         }
@@ -501,9 +750,9 @@
         }
         if (state.currentMsgEl && state.currentMsgEl._subStatus && ev.progress) {
           const [d, t] = ev.progress.split('/');
-          state.currentMsgEl._subStatus.querySelector('em').textContent = `${t} 个子任务`;
+          state.currentMsgEl._subStatus.querySelector('em').textContent = t('status.subtasks', { n: t });
           state.currentMsgEl._subStatus.querySelector('.status-text').innerHTML =
-            `已完成 <em>${d}/${t}</em> 个子任务…`;
+            t('status.done', { d: d, t: t });
         }
         break;
 
@@ -511,7 +760,7 @@
         // 汇总阶段：更新子任务状态条文案
         if (state.currentMsgEl && state.currentMsgEl._subStatus) {
           state.currentMsgEl._subStatus.querySelector('.status-text').innerHTML =
-            `正在综合 <em>${state.planSteps.length}</em> 份子报告…`;
+            t('status.synth', { n: state.planSteps.length });
         }
         break;
 
@@ -525,18 +774,25 @@
           vc.className = 'verify-card' + (ev.excluded ? ' excluded' : '');
           const g = ev.grounding;
           let cls, label;
-          if (ev.excluded) { cls = 'excluded'; label = '未通过核查 · 已排除'; }
-          else if (g >= 0.6) { cls = 'high'; label = '已支撑'; }
-          else if (g >= 0.35) { cls = 'med'; label = '部分支撑'; }
-          else { cls = 'low'; label = '证据不足'; }
+          if (ev.excluded) { cls = 'excluded'; label = t('verify.excluded'); }
+          else if (g >= 0.6) { cls = 'high'; label = t('verify.supported'); }
+          else if (g >= 0.35) { cls = 'med'; label = t('verify.partial'); }
+          else { cls = 'low'; label = t('verify.unsupported'); }
+          // 排除原因为代码（no_sources / low_grounding），按语言映射展示
+          let exclText = '';
+          if (ev.excluded) {
+            const code = String(ev.excluded).split(':')[0];
+            exclText = t('excl.' + code) || String(ev.excluded);
+            if (code === 'low_grounding' && g != null) exclText = t('excl.low_grounding', { g: g.toFixed(2) });
+          }
           vc.innerHTML = `
             <div class="verify-head">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
-              事实核查
+              ${t('verify.head')}
             </div>
             <div class="verify-q">${escapeHtml(ev.sub_q)}</div>
             <div class="verify-result ${cls}">${label}${g != null ? ` · grounding ${g.toFixed(3)}` : ''}</div>
-            ${ev.excluded ? `<div class="verify-flag">${escapeHtml(ev.excluded)}</div>` : ''}
+            ${exclText ? `<div class="verify-flag">${escapeHtml(exclText)}</div>` : ''}
             ${ev.flag ? `<div class="verify-flag">${escapeHtml(ev.flag)}</div>` : ''}`;
           state.currentMsgEl.querySelector('.bubble').appendChild(vc);
         }
@@ -545,7 +801,7 @@
       case 'tool':
         state.trace.push(ev);
         // 子 Agent 转发的事件加"研究"前缀，与主 Agent 动作区分
-        addTraceStep(ev.tag === 'sub' ? `研究 · ${ev.name}` : ev.name,
+        addTraceStep(ev.tag === 'sub' ? t('trace.research', { name: ev.name }) : ev.name,
                      ev.args, ev.status || 'ok', ev.dur || '');
         // 记录最近一次检索词，供来源抽屉高亮
         if (ev.name === 'rag_search' && ev.args && ev.args.query) {
@@ -572,7 +828,7 @@
       case 'error':
         if (state.currentMsgEl) {
           state.currentMsgEl.querySelector('.md.stream').innerHTML =
-            `<div class="msg-error">服务错误：${escapeHtml(ev.error || '未知')}</div>`;
+            `<div class="msg-error">${escapeHtml(t('err.service', { msg: ev.error || t('err.unknown') }))}</div>`;
         }
         break;
 
@@ -635,7 +891,7 @@
       state.mode = btn.dataset.mode;
       // 多 Agent 模式时提示
       if (state.mode === 'multi') {
-        toast('多 Agent 并行：分解 → 研究 → 核查 → 汇总');
+        toast(t('mode.toast'));
       }
     });
   });
@@ -653,17 +909,18 @@
   function renderSessions(sessions) {
     sessionList.innerHTML = '';
     if (!sessions.length) {
-      sessionList.innerHTML = '<div class="kb-empty" style="padding:8px">暂无历史会话</div>';
+      sessionList.innerHTML = '<div class="kb-empty" style="padding:8px">' + t('session.none') + '</div>';
       return;
     }
     sessions.forEach(s => {
       const el = document.createElement('div');
       el.className = 'session-item' + (s.id === state.sessionId ? ' active' : '');
-      const title = s.title && s.title !== '新会话' ? s.title : '新会话';
+      const isDefault = !s.title || s.title === '新会话';
+      const title = isDefault ? t('session.new') : s.title;
       el.innerHTML = `
         <span class="sess-title">${escapeHtml(title)}</span>
         <span class="sess-time">${fmtTime(s.created)}</span>
-        <span class="sess-del" title="删除">
+        <span class="sess-del" title="${t('kb.delete')}">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
         </span>`;
       el.querySelector('.sess-title').addEventListener('click', () => switchSession(s.id));
@@ -684,7 +941,7 @@
     traceEmpty.classList.remove('hidden');
     // 标题
     const found = SESSIONS_CACHE.find(s => s.id === sid);
-    sessionTitle.textContent = found && found.title !== '新会话' ? found.title : '新会话';
+    sessionTitle.textContent = found && found.title !== '新会话' ? found.title : t('session.new');
     loadSessions();
   }
   let SESSIONS_CACHE = [];
@@ -723,17 +980,17 @@
         <span class="kb-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
         <span class="kb-name" title="${escapeHtml(d.doc)}">${escapeHtml(d.doc)}</span>
         <span class="kb-chunks">${d.chunks}</span>
-        <span class="kb-del" title="从知识库删除">
+        <span class="kb-del" title="${t('kb.removeTitle')}">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </span>`;
       el.querySelector('.kb-del').addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm(`从知识库删除 ${d.doc}？`)) return;
+        if (!confirm(t('kb.removeConfirm', { doc: d.doc }))) return;
         try {
           await api(`/api/documents/${encodeURIComponent(d.doc)}`, { method: 'DELETE' });
-          toast(`已删除 ${d.doc}`);
+          toast(t('kb.deleted', { doc: d.doc }));
           loadKB();
-        } catch (err) { toast('删除失败：' + err.message, true); }
+        } catch (err) { toast(t('kb.deleteFail', { msg: err.message }), true); }
       });
       kbList.appendChild(el);
     });
@@ -744,15 +1001,15 @@
       el.style.opacity = '.6';
       el.innerHTML = `
         <span class="kb-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></span>
-        <span class="kb-name" title="待导入">${escapeHtml(f)}</span>
-        <span class="kb-chunks">待入库</span>`;
+        <span class="kb-name" title="${t('kb.pending')}">${escapeHtml(f)}</span>
+        <span class="kb-chunks">${t('kb.toIngest')}</span>`;
       el.addEventListener('click', () => ingestFileFromDir(f));
       kbList.appendChild(el);
     });
     if (!indexed.length && !pending.length) {
-      kbList.innerHTML = '<div class="kb-empty">知识库为空，点击"导入文档"添加</div>';
+      kbList.innerHTML = '<div class="kb-empty">' + t('kb.empty') + '</div>';
     }
-    kbStats.textContent = indexed.length ? `${indexed.length} 份文档 · ${indexed.reduce((a, b) => a + b.chunks, 0)} 片段` : '';
+    kbStats.textContent = indexed.length ? t('kb.count', { d: indexed.length, c: indexed.reduce((a, b) => a + b.chunks, 0) }) : '';
     if (data.error) kbStats.textContent = '⚠ ' + data.error;
   }
   async function ingestFileFromDir(fname) {
@@ -762,10 +1019,10 @@
       const resp = await fetch('/api/ingest_dir', { method: 'POST' });
       const data = await resp.json();
       if (data.ok) {
-        toast(`扫描目录完成，共入库 ${data.total_chunks} 片段`);
+        toast(t('kb.scanDone', { n: data.total_chunks }));
         loadKB();
       }
-    } catch (e) { toast('扫描失败：' + e.message, true); }
+    } catch (e) { toast(t('kb.scanFail', { msg: e.message }), true); }
   }
 
   // 上传文件
@@ -781,10 +1038,10 @@
       try {
         const resp = await fetch('/api/ingest', { method: 'POST', body: fd });
         const data = await resp.json();
-        if (data.ok) toast(`${data.file} → ${data.chunks} 片段已入库`);
-        else toast(`${data.file}：${data.note || '入库失败'}`, true);
+        if (data.ok) toast(t('kb.ingested', { file: data.file, n: data.chunks }));
+        else toast(t('kb.ingestFail', { file: data.file, msg: data.note || '' }), true);
       } catch (e) {
-        toast(`${f.name} 上传失败：${e.message}`, true);
+        toast(t('kb.uploadFail', { file: f.name, msg: e.message }), true);
       }
     }
     loadKB();
@@ -853,44 +1110,44 @@
         if (data.available) dot.className = 'gpu-dot ok';
         else if (data.demo) dot.className = 'gpu-dot warn';
         else dot.className = 'gpu-dot';
-        $('gpu-chip-label').textContent = data.available ? 'AMD GPU' : '演示';
+        $('gpu-chip-label').textContent = data.available ? 'AMD GPU' : t('gpu.demoChip');
         $('gpu-metric-vram').textContent = `${vramPct}%`;
         $('gpu-metric-temp').textContent = temp != null ? `${temp}°C` : '—';
 
         // 右侧指标
         gpuMetrics.innerHTML = `
           <div class="gpu-metric-row">
-            <span class="gm-label">GPU 名称</span>
+            <span class="gm-label">${t('gpu.name')}</span>
             <span class="gm-value" style="font-size:12px;min-width:0;text-align:left;color:var(--text-tertiary)">${escapeHtml(g.name || '—')}</span>
           </div>
           <div class="gpu-metric-row">
-            <span class="gm-label">利用率</span>
+            <span class="gm-label">${t('gpu.util')}</span>
             <span class="gm-value">${util}%</span>
             <span class="gm-bar"><span class="gm-fill" style="width:${util}%;background:var(--gpu-util)"></span></span>
           </div>
           <div class="gpu-metric-row">
-            <span class="gm-label">显存占用</span>
+            <span class="gm-label">${t('gpu.vram')}</span>
             <span class="gm-value">${vramPct}%</span>
             <span class="gm-bar"><span class="gm-fill" style="width:${vramPct}%;background:var(--gpu-vram)"></span></span>
           </div>
           <div class="gpu-metric-row">
-            <span class="gm-label">温度</span>
+            <span class="gm-label">${t('gpu.temp')}</span>
             <span class="gm-value" style="color:${temp != null && temp > 80 ? 'var(--gpu-temp-hot)' : 'var(--text-primary)'}">${temp != null ? temp + '°C' : '—'}</span>
             <span class="gm-bar"><span class="gm-fill" style="width:${temp != null ? Math.min(100, temp / 100 * 100) : 0}%;background:${temp != null && temp > 80 ? 'var(--gpu-temp-hot)' : 'var(--gpu-fan)'}"></span></span>
           </div>
           <div class="gpu-metric-row">
-            <span class="gm-label">功耗</span>
+            <span class="gm-label">${t('gpu.power')}</span>
             <span class="gm-value">${power != null ? power + 'W' : '—'}</span>
             <span class="gm-bar"><span class="gm-fill" style="width:${power != null ? Math.min(100, power / 300 * 100) : 0}%;background:var(--gpu-power)"></span></span>
           </div>
           <div class="gpu-metric-row">
-            <span class="gm-label">核心时钟</span>
+            <span class="gm-label">${t('gpu.clock')}</span>
             <span class="gm-value">${clock != null ? clock + 'MHz' : '—'}</span>
             <span class="gm-bar"><span class="gm-fill" style="width:${clock != null ? Math.min(100, clock / 3500 * 100) : 0}%;background:var(--gpu-clock)"></span></span>
           </div>`;
         gpuNote.innerHTML = data.demo
-          ? '<b>演示数据</b> — 本机未检测到 AMD GPU。部署到 Radeon Cloud 后显示真实 rocm-smi 指标。'
-          : `来源：${data.source} · 实时刷新 2s`;
+          ? t('gpu.demoNote')
+          : t('gpu.sourceNote', { src: data.source });
 
         // 历史数据
         gpuHistory.push({ util, vramPct: vramPct, temp: temp || 0, power: power || 0 });
@@ -920,24 +1177,24 @@
       const fmt = (k, v) => `<div class="hi-row"><span>${k}</span><span class="hi-val">${escapeHtml(String(v))}</span></div>`;
       $('health-info').innerHTML = `
         <div class="hi-block">
-          <div class="hi-label">模型</div>
-          ${fmt('后端', d.model.backend)}${fmt('模型', d.model.name)}${fmt('服务地址', d.model.base_url)}
+          <div class="hi-label">${t('modal.model')}</div>
+          ${fmt(t('modal.backend'), d.model.backend)}${fmt(t('modal.model'), d.model.name)}${fmt(t('modal.url'), d.model.base_url)}
         </div>
         <div class="hi-block">
-          <div class="hi-label">检索</div>
-          ${fmt('混合检索', d.rag.hybrid ? 'BM25 + 向量' : '纯向量')}${fmt('重排', d.rag.rerank ? 'on' : 'off')}${fmt('Embedding', d.embedding)}
+          <div class="hi-label">${t('modal.retrieval')}</div>
+          ${fmt(t('modal.hybrid'), d.rag.hybrid ? (LANG === 'zh' ? 'BM25 + 向量' : 'BM25 + vector') : t('modal.vector'))}${fmt(t('modal.rerank'), d.rag.rerank ? 'on' : 'off')}${fmt(t('modal.embedding'), d.embedding)}
         </div>
         <div class="hi-block">
-          <div class="hi-label">知识库</div>
-          ${fmt('文档', d.rag.docs)}${fmt('片段', d.rag.chunks)}${fmt('目录', d.rag.docs_dir)}
+          <div class="hi-label">${t('modal.kb')}</div>
+          ${fmt(t('modal.docs'), d.rag.docs)}${fmt(t('modal.chunks'), d.rag.chunks)}${fmt(t('modal.dir'), d.rag.docs_dir)}
         </div>
         <div class="hi-block">
-          <div class="hi-label">AMD GPU</div>
-          <div class="hi-row"><span>状态</span><span><span class="hi-badge ${d.gpu.available ? 'on' : 'off'}">${d.gpu.available ? '已连接' : '未检测到'}</span> ${d.gpu.source || ''}</span></div>
+          <div class="hi-label">${t('modal.gpu')}</div>
+          <div class="hi-row"><span>${t('modal.status')}</span><span><span class="hi-badge ${d.gpu.available ? 'on' : 'off'}">${d.gpu.available ? t('modal.connected') : t('modal.notDetected')}</span> ${d.gpu.source || ''}</span></div>
         </div>
-        <div class="hi-row"><span>服务器时间</span><span class="hi-val mono">${d.time}</span></div>`;
+        <div class="hi-row"><span>${t('modal.time')}</span><span class="hi-val mono">${d.time}</span></div>`;
     } catch (e) {
-      $('health-info').textContent = '无法获取系统信息';
+      $('health-info').textContent = t('modal.loading');
     }
   });
   $('modal-close').addEventListener('click', () => $('modal-mask').classList.add('hidden'));
@@ -980,8 +1237,16 @@
     if (autoScroll) chatScroll.scrollTop = chatScroll.scrollHeight;
   }
 
+  /* ---------- 语言切换（设置弹窗内） ---------- */
+  const langSelect = document.getElementById('lang-select');
+  if (langSelect) {
+    langSelect.value = LANG;
+    langSelect.addEventListener('change', () => setLang(langSelect.value));
+  }
+
   /* ---------- 初始化 ---------- */
   (async function init() {
+    applyI18n();
     await loadSessions();
     await loadKB();
     refreshGpu();
@@ -991,7 +1256,7 @@
     try {
       const h = await api('/api/health');
       if (h.gpu && h.gpu.available) $('gpu-chip-label').textContent = 'AMD GPU';
-      else if (h.gpu && h.gpu.source === 'demo') $('gpu-chip-label').textContent = '演示';
+      else if (h.gpu && h.gpu.source === 'demo') $('gpu-chip-label').textContent = t('gpu.demoChip');
     } catch (e) {}
     input.focus();
   })();

@@ -130,32 +130,39 @@ def _sentence_overlap(sent: str, query_ngrams: set) -> float:
 def _compress_chunk(query: str, chunk: str, threshold: float) -> Tuple[str, bool]:
     """上下文压缩：把片段裁剪到与查询相关的句子。
 
-    规则：
-    - 首句（话题句）始终保留，保证上下文连贯；
-    - 其余句子按与查询的字符 3-gram 重叠率 >= threshold 保留；
-    - 若裁剪后不足原文 20%，退化为「首句 + 重叠率最高句」。
-    返回 (压缩后文本, 是否发生裁剪)。片段 <120 字符时原样返回（no-op）。
+    规则（保守，宁可少裁也不丢关键内容）：
+    - 始终保留前 2 句（话题句 + 首内容句），保证上下文连贯；
+    - 保留与查询存在任意字符 3-gram 重叠的句子（ov > 0），或重叠率 >= threshold 的句子；
+    - 最低内容保证：若压缩后不足原文 35%，依次补回剩余句子直到达标——
+      避免复杂长查询把片段裁成只剩标题（曾导致子 Agent 无真实上下文、grounding 崩坏）。
+    返回 (压缩后文本, 是否发生裁剪)。片段 <160 字符时原样返回（no-op）。
     """
     text = chunk.strip()
-    if len(text) < 120:          # 短片段不值得压缩
+    if len(text) < 160:          # 短片段不值得压缩
         return text, False
     qn = _char_ngrams(query)
     if not qn:
         return text, False
     sentences = _split_sentences(text)
-    if len(sentences) <= 1:
+    if len(sentences) <= 2:
         return text, False
     kept = []
     for i, s in enumerate(sentences):
-        if i == 0 or _sentence_overlap(s, qn) >= threshold:
+        ov = _sentence_overlap(s, qn)
+        if i < 2 or ov > 0 or ov >= threshold:
             kept.append(s)
     orig_len = len(_char_normalize(text))
     kept_len = len(_char_normalize("".join(kept)))
-    if orig_len and kept_len < orig_len * 0.2:
-        # 压缩过度：保留首句 + 与查询重叠率最高的句
-        best = max(sentences, key=lambda s: _sentence_overlap(s, qn))
-        kept = [sentences[0]] if best == sentences[0] else [sentences[0], best]
-        kept_len = len(_char_normalize("".join(kept)))
+    # 最低内容保证：压缩后至少保留原文 35%
+    target = orig_len * 0.35
+    if kept_len < target:
+        for s in sentences:
+            if s in kept:
+                continue
+            kept.append(s)
+            kept_len = len(_char_normalize("".join(kept)))
+            if kept_len >= target:
+                break
     changed = orig_len > 0 and kept_len < orig_len
     return "\n".join(kept), changed
 

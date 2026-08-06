@@ -77,12 +77,26 @@ VERIFIED_FLOOR = 0.25
 
 
 def _exclusion_reason(verdict: dict) -> str:
-    """返回子报告被排除的说明；通过核查则返回空串。"""
+    """返回子报告被排除的原因代码（供 UI 按语言映射）；通过核查返回空串。
+
+    代码：'no_sources'（未检索到可用来源）| 'low_grounding'（低于阈值）。
+    """
     g = verdict.get("grounding")
     if g is None:
-        return "该子任务未检索到可用来源，结论基于模型常识，未通过核查。"
+        return "no_sources"
     if g < VERIFIED_FLOOR:
-        return f"该子任务 grounding={g:.2f} 低于核查阈值 {VERIFIED_FLOOR}，未通过核查。"
+        return "low_grounding"
+    return ""
+
+
+def _exclusion_reason_text(verdict: dict) -> str:
+    """排除原因的中文说明（用于综合提示词中的披露清单）。"""
+    code = _exclusion_reason(verdict)
+    if code == "no_sources":
+        return "该子任务未检索到可用来源，结论基于模型常识，未通过核查。"
+    if code == "low_grounding":
+        return (f"该子任务 grounding={verdict.get('grounding', 0):.2f} "
+                f"低于核查阈值 {VERIFIED_FLOOR}，未通过核查。")
     return ""
 
 
@@ -279,7 +293,7 @@ class MultiAgentOrchestrator:
         for r in checked:
             reason = _exclusion_reason(r["verdict"])
             if reason:
-                r["verdict"]["excluded"] = reason + " 不进入综合。"
+                r["verdict"]["excluded"] = _exclusion_reason_text(r["verdict"]) + " 不进入综合。"
                 excluded.append(r)
             else:
                 passed.append(r)
@@ -292,7 +306,7 @@ class MultiAgentOrchestrator:
             passed = checked
             fallback_all_excluded = True
             for r in excluded:
-                r["verdict"]["excluded"] = _exclusion_reason(r["verdict"]) + " 该子任务内容可信度有限，请如实披露。"
+                r["verdict"]["excluded"] = _exclusion_reason_text(r["verdict"]) + " 该子任务内容可信度有限，请如实披露。"
         self._verified_sub_reports = passed
         self._excluded_sub_reports = excluded
         self._verified_count = verified_count

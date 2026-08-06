@@ -691,6 +691,26 @@ button { font-family: inherit; cursor: pointer; background: none; border: none; 
 .hi-badge.on { background: rgba(52,194,107,.14); color: var(--success); }
 .hi-badge.off { background: rgba(255,91,82,.14); color: var(--danger); }
 
+/* 语言选择器 */
+.lang-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(180deg, var(--bg-surface-3), var(--bg-surface-2));
+  border: 1px solid var(--border-default);
+  border-radius: 7px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 28px 5px 10px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23A7ADB6' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.lang-select:hover { border-color: var(--border-strong); }
+.lang-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
 /* 来源查看抽屉（Onyx 式右侧深潜面板） */
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0;

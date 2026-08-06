@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Private RAG Agent · 本地私有智能体</title>
-<link rel="stylesheet" href="/static/style.css?v=15">
+<title>Private RAG Agent · Local Private Agent</title>
+<link rel="stylesheet" href="/static/style.css?v=17">
 <link rel="stylesheet" href="/static/vendor/github-dark.min.css">
 </head>
 <body>
@@ -21,16 +21,16 @@
       </div>
       <span class="brand-name">Private&nbsp;RAG</span>
       <span class="topbar-divider"></span>
-      <span id="session-title" class="session-title">新会话</span>
+      <span id="session-title" class="session-title" data-i18n="session.new">New session</span>
     </div>
     <div class="topbar-right">
-      <div id="gpu-badge" class="gpu-badge" title="AMD GPU 实时状态">
+      <div id="gpu-badge" class="gpu-badge" title="AMD GPU live status" data-i18n-title="gpu.badgeTitle">
         <span class="gpu-dot" id="gpu-dot"></span>
         <span class="gpu-chip-label" id="gpu-chip-label">GPU</span>
         <span class="gpu-metric" id="gpu-metric-vram">—</span>
         <span class="gpu-metric mono" id="gpu-metric-temp">—</span>
       </div>
-      <button id="settings-btn" class="icon-btn" title="系统信息">
+      <button id="settings-btn" class="icon-btn" title="System info" data-i18n-title="settings.title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -47,27 +47,27 @@
       <div class="sidebar-top">
         <button id="new-chat-btn" class="new-chat-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          新建会话
+          <span data-i18n="chat.new">New chat</span>
         </button>
         <div id="session-list"></div>
       </div>
       <div class="sidebar-footer">
-        <div class="section-label">知识库</div>
+        <div class="section-label" data-i18n="kb.label">Knowledge base</div>
         <div id="kb-list" class="kb-list"></div>
         <div class="kb-actions">
-          <button id="import-btn" class="ghost-btn" title="导入文档（PDF/Word/Markdown/Excel/PPT）">
+          <button id="import-btn" class="ghost-btn" title="Import documents (PDF/Word/Markdown/Excel/PPT)" data-i18n-title="kb.importTitle">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-            导入文档
+            <span data-i18n="kb.import">Import docs</span>
           </button>
-          <button id="rescan-btn" class="ghost-btn" title="导入 docs 目录下所有待导入文档">
+          <button id="rescan-btn" class="ghost-btn" title="Ingest all pending docs in the docs directory" data-i18n-title="kb.scanTitle">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
-            扫描目录
+            <span data-i18n="kb.scan">Scan folder</span>
           </button>
         </div>
         <div id="kb-stats" class="kb-stats"></div>
         <div class="privacy-strip">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span>数据 100% 本地 · 断网可用</span>
+          <span data-i18n="kb.privacy">100% local · works offline</span>
         </div>
       </div>
     </aside>
@@ -125,28 +125,28 @@
               <circle class="flow-dot" r="2.4" fill="#34C26B" style="offset-path:path('M180 60 H230')"/>
             </svg>
           </div>
-          <h1 class="empty-title">本地私有智能体</h1>
-          <p class="empty-sub">检索你的知识库，生成可追溯的回答。<br>全程本地推理，数据不出本机。</p>
+          <h1 class="empty-title" data-i18n="empty.title">Local Private Agent</h1>
+          <p class="empty-sub"><span data-i18n="empty.sub1">Search your knowledge base for traceable answers.</span><br><span data-i18n="empty.sub2">Fully local inference — data never leaves this machine.</span></p>
           <div class="suggestion-grid">
             <button class="suggestion" data-q="介绍一下我的项目：技术栈、AMD 优化点和部署方式" data-k="1">
               <span class="sug-kbd">1</span>
-              <span class="sug-title">项目全景</span>
-              <span class="sug-sub">技术栈 · AMD 优化 · 部署</span>
+              <span class="sug-title" data-i18n="sug1.title">Project overview</span>
+              <span class="sug-sub" data-i18n="sug1.sub">Stack · AMD optimization · deploy</span>
             </button>
             <button class="suggestion" data-q="总结示例项目说明.md，并给出核心要点" data-k="2">
               <span class="sug-kbd">2</span>
-              <span class="sug-title">总结文档</span>
-              <span class="sug-sub">基于知识库内容归纳</span>
+              <span class="sug-title" data-i18n="sug2.title">Summarize doc</span>
+              <span class="sug-sub" data-i18n="sug2.sub">Grounded in the knowledge base</span>
             </button>
             <button class="suggestion" data-q="我的项目是如何实现完全离线部署的？用了哪些本地组件？" data-k="3">
               <span class="sug-kbd">3</span>
-              <span class="sug-title">架构解读</span>
-              <span class="sug-sub">推理 / 检索 / 记忆链路</span>
+              <span class="sug-title" data-i18n="sug3.title">Architecture</span>
+              <span class="sug-sub" data-i18n="sug3.sub">Inference / retrieval / memory</span>
             </button>
             <button class="suggestion" data-q="知识库里有哪几份文档？分别覆盖什么内容？" data-k="4">
               <span class="sug-kbd">4</span>
-              <span class="sug-title">盘点知识库</span>
-              <span class="sug-sub">list_docs 工具</span>
+              <span class="sug-title" data-i18n="sug4.title">Browse KB</span>
+              <span class="sug-sub" data-i18n="sug4.sub">list_docs tool</span>
             </button>
           </div>
         </div>
@@ -155,37 +155,37 @@
       <!-- 输入区 -->
       <div id="input-area">
         <div id="input-box" class="input-box">
-          <textarea id="input" rows="1" placeholder="问我的知识库，例如：我的项目用了什么技术栈？"></textarea>
+          <textarea id="input" rows="1" placeholder="Ask my knowledge base, e.g. what stack does my project use?" data-i18n-placeholder="input.placeholder"></textarea>
           <div class="input-toolbar">
             <div class="input-tools">
-              <div class="mode-switch" id="mode-switch" title="推理模式">
-                <button data-mode="single" class="mode-btn active">单 Agent</button>
-                <button data-mode="multi" class="mode-btn">多 Agent <span class="mode-badge">并行</span></button>
+              <div class="mode-switch" id="mode-switch" title="Inference mode" data-i18n-title="mode.title">
+                <button data-mode="single" class="mode-btn active"><span data-i18n="mode.single">Single Agent</span></button>
+                <button data-mode="multi" class="mode-btn"><span data-i18n="mode.multi">Multi-Agent</span> <span class="mode-badge" data-i18n="mode.parallel">Parallel</span></button>
               </div>
               <label class="tool-toggle" id="tools-toggle-label">
                 <input type="checkbox" id="tools-toggle" checked>
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                <span>工具调用</span>
+                <span data-i18n="tools.label">Tool calls</span>
               </label>
             </div>
-            <button id="send-btn" class="send-btn" title="发送 (Enter)">
+            <button id="send-btn" class="send-btn" title="Send (Enter)" data-i18n-title="send.title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             </button>
           </div>
         </div>
-        <div class="input-hint"><span>Enter 发送</span><span class="dot">·</span><span>Shift+Enter 换行</span><span class="dot">·</span><span>回答自动附引用来源</span></div>
+        <div class="input-hint"><span data-i18n="hint.enter">Enter to send</span><span class="dot">·</span><span data-i18n="hint.shift">Shift+Enter for newline</span><span class="dot">·</span><span data-i18n="hint.cite">Answers include citations</span></div>
       </div>
     </main>
 
     <!-- ======== 右面板：运行轨迹 + GPU 监控 ======== -->
     <aside id="activity">
       <div class="panel-tabs">
-        <button data-tab="trace" class="panel-tab active">运行轨迹</button>
-        <button data-tab="gpu" class="panel-tab">GPU 监控</button>
+        <button data-tab="trace" class="panel-tab active" data-i18n="tab.trace">Activity</button>
+        <button data-tab="gpu" class="panel-tab" data-i18n="tab.gpu">GPU Monitor</button>
       </div>
       <div id="panel-trace" class="panel-body">
         <div id="trace-empty" class="panel-empty">
-          <p>发送问题后，这里会实时显示<br>Agent 的每一步动作。</p>
+          <p><span data-i18n="trace.empty1">After you send a question, every</span><br><span data-i18n="trace.empty2">agent action appears here in real time.</span></p>
         </div>
         <div id="trace-list"></div>
       </div>
@@ -204,13 +204,24 @@
 <div id="modal-mask" class="modal-mask hidden">
   <div class="modal">
     <div class="modal-head">
-      <span class="modal-title">系统信息</span>
+      <span class="modal-title" data-i18n="modal.title">System info</span>
       <button class="icon-btn" id="modal-close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
     <div class="modal-body">
-      <div id="health-info" class="health-info">加载中…</div>
+      <div class="hi-block" style="margin-bottom:14px">
+        <div class="hi-label" data-i18n="lang.label">Language</div>
+        <div class="hi-row" style="align-items:center">
+          <span class="lang-options">
+            <select id="lang-select" class="lang-select">
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+          </span>
+        </div>
+      </div>
+      <div id="health-info" class="health-info" data-i18n="modal.loading">Loading…</div>
     </div>
   </div>
 </div>
@@ -224,7 +235,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
         </span>
         <div>
-          <div id="drawer-doc-name" class="drawer-doc-name">文档</div>
+          <div id="drawer-doc-name" class="drawer-doc-name" data-i18n="drawer.doc">Document</div>
           <div id="drawer-doc-meta" class="drawer-doc-meta"></div>
         </div>
       </div>
@@ -232,7 +243,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
-    <div id="drawer-body" class="drawer-body"><div class="drawer-loading">加载原文…</div></div>
+    <div id="drawer-body" class="drawer-body"><div class="drawer-loading" data-i18n="drawer.loading">Loading source…</div></div>
   </div>
 </div>
 
@@ -244,6 +255,6 @@
 <script src="/static/vendor/marked.min.js"></script>
 <script src="/static/vendor/purify.min.js"></script>
 <script src="/static/vendor/highlight.min.js"></script>
-<script src="/static/app.js?v=15"></script>
+<script src="/static/app.js?v=17"></script>
 </body>
 </html>

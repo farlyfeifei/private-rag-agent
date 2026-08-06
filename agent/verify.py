@@ -64,7 +64,7 @@ def groundedness(answer: str, retrieved: List[str]) -> Tuple[float, List[dict]]:
         retrieved:  实际检索到的原文片段列表（来源文档文本）
 
     Returns:
-        (score 0~1, [{"text": 句, "support": 0~1, "level": 已支撑|部分|无支撑}])
+        (score 0~1, [{"text": 句, "support": 0~1, "level": supported|partial|unsupported}])
     """
     if not retrieved:
         return 0.0, []
@@ -83,11 +83,11 @@ def groundedness(answer: str, retrieved: List[str]) -> Tuple[float, List[dict]]:
             continue
         hit = len(ngrams & pool) / len(ngrams)
         if hit > 0.30:
-            level = "已支撑"
+            level = "supported"
         elif hit > 0.12:
-            level = "部分支撑"
+            level = "partial"
         else:
-            level = "无支撑"
+            level = "unsupported"
         items.append({"text": s[:120], "support": round(hit, 3), "level": level})
         scored += hit
     score = scored / len(items) if items else 0.0
@@ -117,13 +117,14 @@ def verify_citations(answer: str, retrieved_sources: set) -> Tuple[float, List[d
 def format_verification(score: float, sentence_checks: List[dict],
                         cite_checks: List[dict]) -> str:
     """把校验结果渲染成给模型/UI 看的文本。"""
+    _lvl = {"supported": "已支撑", "partial": "部分", "unsupported": "未"}
     lines = [f"引用校验：grounding={score}"]
     for chk in cite_checks:
         mark = "✓" if chk.get("grounded") else "✗"
         lines.append(f"  {mark} 引用 {chk['cite']} -> {'有据' if chk.get('grounded') else '无据'}")
     for it in sentence_checks:
-        if it["level"] != "已支撑":
-            lines.append(f"  [{'部分' if it['level']=='部分支撑' else '未'}] {it['text']}…")
+        if it["level"] != "supported":
+            lines.append(f"  [{_lvl.get(it['level'], '未')}] {it['text']}…")
     return "\n".join(lines)
 
 
