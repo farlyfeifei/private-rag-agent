@@ -5,13 +5,18 @@
   查询改写 (LLM, 可选)
     → 向量检索 (ChromaDB, 语义)  +  BM25 (关键词)
     → 分数融合 (Reciprocal Rank Fusion)
+    → 近重复去重（>95% 字符级相同片段丢弃）
     → cross-encoder 重排 (bge-reranker, 可选，极显著提升 Top-k 精度)
+    → 自适应候选池（剔除重排分过弱的填充）
+    → 上下文压缩（裁剪到与查询相关的句子，返回结构不变）
     → 返回带来源与得分的片段列表
 
 设计动机：
 - 纯向量检索对"专有名词 / 缩写 / 精确术语"召回差；BM25 补足精确匹配。
 - cross-encoder 对 (query, doc) 联合打分，精度远高于 bi-encoder 距离，
   是 RAG 精度提升性价比最高的单点手段。
+- 上下文压缩 / 去重 / 自适应池为确定性实现（无额外 embedding 调用），
+  让送给 LLM 的上下文更紧、更聚焦、更少冗余。
 """
 import json
 import os
@@ -50,6 +55,10 @@ RERANK = RAG.get("rerank", True)
 RERANK_MODEL = RAG.get("rerank_model", "BAAI/bge-reranker-base")
 RETRIEVAL_TOP_K = RAG.get("retrieval_top_k", 16)
 QUERY_EXPANSION = RAG.get("query_expansion", True)
+COMPRESSION = RAG.get("compression", True)                # 上下文压缩
+COMPRESSION_THRESHOLD = RAG.get("compression_threshold", 0.12)  # 句子保留重叠阈值
+ADAPTIVE_TOP_K = RAG.get("adaptive_top_k", True)          # 自适应候选池
+DEDUP = RAG.get("dedup", True)                            # 近重复去重
 
 _CORPUS_FILE = os.path.join(DB_DIR, "_corpus.json")
 
@@ -84,6 +93,95 @@ def _split_words(text: str) -> List[str]:
     return tokens
 
 
+# ------------------------------------------------------------- 上下文压缩 / 去重
+# 字符级归一化（复用 verify.py 的归一化思想）：去标点/空白/emoji，只留字母数字与中文。
+# 全部为确定性实现（无额外 embedding / LLM 调用），快且稳定。
+_CHAR_NORM_RE = re.compile(r"[^0-9A-Za-z一-鿿]+")
+
+
+def _char_normalize(text: str) -> str:
+    return _CHAR_NORM_RE.sub("", text).lower()
+
+
+def _char_ngrams(text: str, n: int = 3) -> set:
+    """字符级 n-gram 集合；中文检索无需分词，3-gram 对改写/同义鲁棒。"""
+    t = _char_normalize(text)
+    if len(t) < n:
+        return {t} if t else set()
+    return {t[i:i + n] for i in range(len(t) - n + 1)}
+
+
+_SENT_SPLIT_RE = re.compile(r"(?<=[。！？!?；;])\s*|\n+")
+
+
+def _split_sentences(text: str) -> List[str]:
+    """按中英句读（。！？!?；;）与换行切句，保留标点去掉空白。"""
+    return [p.strip() for p in _SENT_SPLIT_RE.split(text) if p.strip()]
+
+
+def _sentence_overlap(sent: str, query_ngrams: set) -> float:
+    """单句与查询的字符 3-gram 重叠率（0~1）。"""
+    sn = _char_ngrams(sent)
+    if not sn or not query_ngrams:
+        return 0.0
+    return len(sn & query_ngrams) / len(sn)
+
+
+def _compress_chunk(query: str, chunk: str, threshold: float) -> Tuple[str, bool]:
+    """上下文压缩：把片段裁剪到与查询相关的句子。
+
+    规则：
+    - 首句（话题句）始终保留，保证上下文连贯；
+    - 其余句子按与查询的字符 3-gram 重叠率 >= threshold 保留；
+    - 若裁剪后不足原文 20%，退化为「首句 + 重叠率最高句」。
+    返回 (压缩后文本, 是否发生裁剪)。片段 <120 字符时原样返回（no-op）。
+    """
+    text = chunk.strip()
+    if len(text) < 120:          # 短片段不值得压缩
+        return text, False
+    qn = _char_ngrams(query)
+    if not qn:
+        return text, False
+    sentences = _split_sentences(text)
+    if len(sentences) <= 1:
+        return text, False
+    kept = []
+    for i, s in enumerate(sentences):
+        if i == 0 or _sentence_overlap(s, qn) >= threshold:
+            kept.append(s)
+    orig_len = len(_char_normalize(text))
+    kept_len = len(_char_normalize("".join(kept)))
+    if orig_len and kept_len < orig_len * 0.2:
+        # 压缩过度：保留首句 + 与查询重叠率最高的句
+        best = max(sentences, key=lambda s: _sentence_overlap(s, qn))
+        kept = [sentences[0]] if best == sentences[0] else [sentences[0], best]
+        kept_len = len(_char_normalize("".join(kept)))
+    changed = orig_len > 0 and kept_len < orig_len
+    return "\n".join(kept), changed
+
+
+def _is_near_dup(a: str, b: str) -> bool:
+    """近似重复判定：归一化后长度差 ≤5%（>95% 字符级一致）且前 60 个字符相同。"""
+    na, nb = _char_normalize(a), _char_normalize(b)
+    if not na or not nb:
+        return False
+    if min(len(na), len(nb)) / max(len(na), len(nb)) < 0.95:
+        return False
+    return na[:60] == nb[:60]
+
+
+def _dedup_candidates(cand: List[Tuple[str, str, float]]) -> List[Tuple[str, str, float]]:
+    """重排前近重复去重：保留首个出现的片段，丢弃与已保留片段 >95% 字符级相同的。"""
+    kept_texts: List[str] = []
+    out = []
+    for t, src, score in cand:
+        if any(_is_near_dup(t, k) for k in kept_texts):
+            continue
+        kept_texts.append(t)
+        out.append((t, src, score))
+    return out
+
+
 class RAGStore:
     def __init__(self, llm: LLMBackend):
         self.llm = llm
@@ -96,6 +194,7 @@ class RAGStore:
         self._bm25: object = None
         self._reranker = None
         self._st_model = None
+        self.last_meta: Optional[dict] = None
 
     # ------------------------------------------------------------------ 入库
     def _get_or_create(self):
@@ -218,14 +317,33 @@ class RAGStore:
     def search(self, query: str, top_k: int = TOP_K) -> List[Tuple[str, str, float]]:
         """混合检索 -> [(text, source, score)]。
 
-        管线：查询改写（可选）→ 向量∪BM25 → RRF 融合 → cross-encoder 重排。
+        管线：查询改写（可选）→ 向量∪BM25 → RRF 融合 → 近重复去重 →
+        cross-encoder 重排 → 自适应候选池 → 上下文压缩。
+        返回结构保持 (text, source, score) 不变（压缩对调用方透明）。
         任何环节降级都不会中断（纯向量是保底）。
         """
         # 串行化共享原生资源（ChromaDB/hnsw、cross-encoder），见 _RETRIEVE_LOCK 注释
         with _RETRIEVE_LOCK:
             return self._search_unlocked(query, top_k)
 
+    def search_with_meta(self, query: str, top_k: int = TOP_K) -> Tuple[List[Tuple[str, str, float]], dict]:
+        """混合检索 + 检索元信息 -> (results, meta)。
+
+        meta = {confidence: 0~1, top_score: float, compression_applied: bool,
+                sources: [文档名去重]}。
+        confidence = min(top_score, 1)。同样在 _RETRIEVE_LOCK 内完成。
+        """
+        with _RETRIEVE_LOCK:
+            results, meta = self._search_with_meta_unlocked(query, top_k)
+            self.last_meta = meta
+            return results, meta
+
     def _search_unlocked(self, query: str, top_k: int = TOP_K) -> List[Tuple[str, str, float]]:
+        results, _ = self._search_with_meta_unlocked(query, top_k)
+        return results
+
+    def _search_with_meta_unlocked(self, query: str, top_k: int = TOP_K):
+        """完整检索管线（必须在 _RETRIEVE_LOCK 内调用，共享原生资源串行化）。"""
         queries = self._expand_query(query) if QUERY_EXPANSION else [query]
 
         # 1. 各检索源打分
@@ -237,18 +355,64 @@ class RAGStore:
             for cid, score in self._bm25_search(q, RETRIEVAL_TOP_K):
                 bm_hits[cid] = max(bm_hits.get(cid, 0), score)
 
-        # 2. RRF 融合
+        meta = {"confidence": 0.0, "top_score": 0.0,
+                "compression_applied": False, "sources": []}
         fused = self._rrf_fuse([vec_hits, bm_hits], weights=[1 - BM25_WEIGHT, BM25_WEIGHT])
         if not fused:
-            return []
+            return [], meta
 
-        # 3. 重排（可选）
+        # 2. 重排候选池
         corpus = self._load_corpus()
         cand = [(corpus[cid]["text"], corpus[cid]["doc"], score)
                 for cid, score in fused[:RETRIEVAL_TOP_K] if cid in corpus]
+
+        # 3. 近重复去重（重排前，丢弃 >95% 字符级相同的片段）
+        if DEDUP and len(cand) > 1:
+            try:
+                cand = _dedup_candidates(cand)
+            except Exception as e:
+                _log(f"[warn] near-dup dedup failed: {e}")
+
+        # 4. cross-encoder 重排（可选，失败回退到 RRF 序）
+        reranked = False
         if RERANK and len(cand) >= 2:
-            cand = self._rerank(query, cand)
-        return cand[:top_k]
+            cand, reranked = self._rerank(query, cand)
+
+        # 5. 自适应候选池：剔除重排分过弱的填充，不让弱结果稀释上下文
+        if ADAPTIVE_TOP_K and reranked and cand:
+            try:
+                top_score = max(s for _, _, s in cand)
+                thr = max(0.5 * top_score, 0.15)
+                kept = [c for c in cand if c[2] >= thr]
+                if not kept:          # 全弱分（如全负 logits）时保底最强一条
+                    kept = cand[:1]
+                cand = kept
+            except Exception as e:
+                _log(f"[warn] adaptive top-k failed: {e}")
+
+        results = cand[:top_k]
+
+        # 6. 上下文压缩：只保留与查询相关的句子（压缩对返回结构透明）
+        if COMPRESSION and results:
+            try:
+                compressed = []
+                applied = False
+                for t, src, score in results:
+                    ct, changed = _compress_chunk(query, t, COMPRESSION_THRESHOLD)
+                    applied = applied or changed
+                    compressed.append((ct, src, score))
+                results = compressed
+                meta["compression_applied"] = applied
+            except Exception as e:
+                _log(f"[warn] contextual compression failed: {e}")
+
+        # 7. 检索元信息
+        meta["top_score"] = max((s for _, _, s in results), default=0.0)
+        meta["confidence"] = min(meta["top_score"], 1.0)
+        for _, src, _ in results:
+            if src not in meta["sources"]:
+                meta["sources"].append(src)
+        return results, meta
 
     def _vector_search(self, query: str, top_k: int = RETRIEVAL_TOP_K):
         """纯向量检索 -> [(cid, similarity)]"""
@@ -300,8 +464,12 @@ class RAGStore:
         fused = sorted(score.items(), key=lambda kv: -kv[1])
         return fused
 
-    def _rerank(self, query: str, cand: List[Tuple[str, str, float]]) -> List[Tuple[str, str, float]]:
-        """cross-encoder 重排：(query, doc) 联合打分，按分排序。"""
+    def _rerank(self, query: str, cand: List[Tuple[str, str, float]]) -> Tuple[List[Tuple[str, str, float]], bool]:
+        """cross-encoder 重排：(query, doc) 联合打分，按分排序。
+
+        Returns: (重排后候选, 是否成功)。失败时原样返回候选 + False，
+        供上层决定是否应用自适应候选池（只在真实重排分上生效）。
+        """
         global _SHARED_RERANKER
         try:
             if _SHARED_RERANKER is None:
@@ -310,12 +478,12 @@ class RAGStore:
             self._reranker = _SHARED_RERANKER
             pairs = [(query, t) for t, _, _ in cand]
             scores = self._reranker.predict(pairs, show_progress_bar=False)
-            # 保留原始 RRF 分作 tie-break
+            # 保留原始 RRF 分作 tie-break；转原生 float（numpy 标量不 JSON 安全）
             scored = sorted(zip(cand, scores), key=lambda x: -x[1])
-            return [(t, src, round(score, 4)) for (t, src, _), score in scored]
+            return [(t, src, round(float(score), 4)) for (t, src, _), score in scored], True
         except Exception as e:
             _log(f"[warn] rerank unavailable, use fused order: {e}")
-            return cand
+            return cand, False
 
     # ----------------------------------------------------------- 其他查询
     def list_documents(self) -> List[dict]:

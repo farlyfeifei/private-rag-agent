@@ -26,6 +26,10 @@ rag:
   rerank_model: BAAI/bge-reranker-v2-m3  # 多语言重排模型（含中文，更强）
   retrieval_top_k: 16       # 混合候选池（重排前取多少条）
   query_expansion: true     # LLM 查询改写（本地小模型轻量改写）
+  compression: true         # 上下文压缩（重排后裁剪到与查询相关的句子）
+  compression_threshold: 0.12  # 句子保留的字符3-gram重叠阈值
+  adaptive_top_k: true      # 自适应候选池（剔除重排分过弱的填充）
+  dedup: true               # 近重复片段去重（重排前）
 
 memory:
   max_history: 10           # 保留几轮对话历史

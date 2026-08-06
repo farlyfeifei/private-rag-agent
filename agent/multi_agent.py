@@ -47,11 +47,12 @@ SYNTHESIZE_PROMPT = """你是一名资深分析师。下面是针对同一问题
 
 请综合这些子报告，产出一份**结构化、有逻辑、完整**的最终答案。
 要求：
-1. 组织清晰：用标题/分点/列表。
+1. 结构清晰：用 Markdown 标题（## / ###）组织各主要部分，辅以分点/列表，便于阅读。
 2. 综合而非罗列：把各子报告的信息整合成连贯叙述。
-3. 标注来源（用 [来源:文档名] 格式）。**只引用子报告"来源"字段里真实存在的文档名**（例如 [来源:技术白皮书.md]），不要臆造文件名。
+3. 每个段落或小节都要标注来源（用 [来源:文档名] 格式）。**只引用子报告"来源"字段里真实存在的文档名**（例如 [来源:技术白皮书.md]），不要臆造文件名；某段无法给出可靠来源时请如实说明。
 4. 传给本提示的所有子报告均已通过事实核查；若文末有"未通过核查、已排除"的清单，请在答案最后用一段话如实说明这些方面未获知识库支撑，且不要为它们编造内容。
-5. 最后用一段话总结核心结论。
+5. 诚实披露：若整体 grounding 偏低，或有多份子报告未通过核查（只通过了 x/y 个子任务），请在答案开头用一行引用块（blockquote）如实说明，例如：> 仅 x/y 个子任务通过事实核查，其余部分可信度有限，以下内容请谨慎采信。不要回避或粉饰这一事实。
+6. 最后用一段话总结核心结论。
 请用中文回答。
 """
 
@@ -146,6 +147,10 @@ class MultiAgentOrchestrator:
                     ev = dict(ev)
                     ev["tag"] = "sub"
                     emit(ev)
+            # 结果健全性：子 Agent 未产出任何内容时给出显式占位，
+            # 让核查器与综合器看到明确的缺口，而不是静默缺失内容
+            if not text.strip():
+                text = "（该子任务未返回内容）"
             self.sub_traces[sub_q] = sub.trace
             return {
                 "sub_q": sub_q,
@@ -200,6 +205,19 @@ class MultiAgentOrchestrator:
         return {"grounding": g_score, "cite_precision": cite_p,
                 "cites": cites, "flag": flag, "sentences": sents}
 
+    @staticmethod
+    def _classify_confidence(verification: dict) -> str:
+        """按最终答案 groundedness 划分整体置信度：
+        >=0.6 → high；0.35~0.6 → medium；其余（含无来源）→ low。"""
+        g = (verification or {}).get("grounding")
+        if g is None:
+            return "low"
+        if g >= 0.6:
+            return "high"
+        if g >= 0.35:
+            return "medium"
+        return "low"
+
     # ------------------------------------------------------------- 主流程
     def run_events(self, question: str, n: int = 3):
         """富事件流：分解 → 并行研究 → 核查 → 汇总。"""
@@ -250,7 +268,8 @@ class MultiAgentOrchestrator:
             # 实时告知 UI：该子报告是否被排除出综合（"未通过核查"在界面上一眼可见）
             exclusion = _exclusion_reason(verdict)
             yield {"type": "verify", "sub_q": r["sub_q"], "grounding": verdict["grounding"],
-                   "flag": verdict.get("flag", ""), "excluded": exclusion}
+                   "flag": verdict.get("flag", ""), "excluded": exclusion,
+                   "cite_precision": verdict.get("cite_precision")}
         self.sub_reports = checked
 
         # 汇总前的核查过滤："汇总只用通过核查的内容"必须是硬保证而非提示词约定。
@@ -264,6 +283,8 @@ class MultiAgentOrchestrator:
                 excluded.append(r)
             else:
                 passed.append(r)
+        # 兜底会重写 passed，先在此锁定"真正通过核查"的子任务数，供置信度披露使用
+        verified_count = len(passed)
         fallback_all_excluded = False
         if not passed:
             # 极端兜底：全部未通过时仍综合（否则无答案），但必须把"未获支撑"这一事实
@@ -274,6 +295,7 @@ class MultiAgentOrchestrator:
                 r["verdict"]["excluded"] = _exclusion_reason(r["verdict"]) + " 该子任务内容可信度有限，请如实披露。"
         self._verified_sub_reports = passed
         self._excluded_sub_reports = excluded
+        self._verified_count = verified_count
         self._fallback_all_excluded = fallback_all_excluded
 
         # 汇总
@@ -322,8 +344,20 @@ class MultiAgentOrchestrator:
             cp, cites = verify_citations(full, all_sources)
             self.verification = {"grounding": g, "sentences": sents,
                                  "cite_precision": cp, "cites": cites}
+        else:
+            # 全程无来源时 verification 仍为空，赋空 dict 以便统一附加置信度字段
+            self.verification = self.verification or {}
+        # 整体置信度披露：随 done 事件与 self.verification 一起上报
+        excluded_count = len(self._excluded_sub_reports)
+        verified_count = getattr(self, "_verified_count", 0)
+        confidence = self._classify_confidence(self.verification)
+        self.verification["confidence"] = confidence
+        self.verification["excluded_count"] = excluded_count
+        self.verification["verified_count"] = verified_count
         yield {"type": "done", "verification": self.verification,
-               "trace": self._flat_trace(), "sub_reports": self.sub_reports}
+               "trace": self._flat_trace(), "sub_reports": self.sub_reports,
+               "confidence": confidence, "excluded_count": excluded_count,
+               "verified_count": verified_count}
 
     def _flat_trace(self) -> list:
         flat = []

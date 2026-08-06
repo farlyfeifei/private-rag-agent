@@ -278,6 +278,15 @@
     if (g >= 0.6) { level = 'high'; label = `已支撑 · 证据强度 ${Math.round(g * 100)}%`; }
     else if (g >= 0.35) { level = 'med'; label = `部分支撑 · ${Math.round(g * 100)}%`; }
     else { level = 'low'; label = `证据不足 · ${Math.round(g * 100)}%`; }
+    // 多 Agent 模式附带的整体置信度分类与排除计数（后端 done 事件新增字段）
+    const conf = verification.confidence;
+    if (conf && g != null) {
+      const map = { high: '高', medium: '中', low: '低' };
+      if (map[conf]) label += ` · 置信度${map[conf]}`;
+    }
+    if (verification.excluded_count > 0) {
+      label += ` · ${verification.excluded_count} 个子任务未通过核查`;
+    }
     const icons = {
       high: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
       med: `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M3 12h18" opacity=".8"/></svg>`,
