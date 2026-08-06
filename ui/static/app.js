@@ -55,8 +55,14 @@
       'kb.label': 'Knowledge base',
       'kb.import': 'Import docs',
       'kb.importTitle': 'Import documents (PDF/Word/Markdown/Excel/PPT)',
-      'kb.scan': 'Scan folder',
-      'kb.scanTitle': 'Ingest all pending docs in the docs directory',
+      'kb.folder': 'Scan folder',
+      'kb.folderTitle': 'Select a folder and import all documents inside',
+      'kb.scanAll': 'Read all',
+      'kb.scanAllTitle': 'Read all supported documents on this machine',
+      'kb.scanning': 'Scanning…',
+      'kb.allScanning': 'Reading all local documents — this may take a few minutes…',
+      'kb.folderIngested': 'Folder: {n} files · {c} chunks ingested',
+      'kb.allIngested': 'Read-all done — {f} files · {c} chunks ingested',
       'kb.privacy': '100% local · works offline',
       'empty.title': 'Local Private Agent',
       'empty.sub1': 'Search your knowledge base for traceable answers.',
@@ -160,8 +166,14 @@
       'kb.label': '知识库',
       'kb.import': '导入文档',
       'kb.importTitle': '导入文档（PDF/Word/Markdown/Excel/PPT）',
-      'kb.scan': '扫描目录',
-      'kb.scanTitle': '导入 docs 目录下所有待导入文档',
+      'kb.folder': '扫描文件夹',
+      'kb.folderTitle': '选中一个文件夹，导入其中全部文档',
+      'kb.scanAll': '全部读取',
+      'kb.scanAllTitle': '读取本机所有受支持的文档',
+      'kb.scanning': '正在扫描…',
+      'kb.allScanning': '正在读取本机所有文档…可能需要几分钟',
+      'kb.folderIngested': '文件夹：{n} 个文件 · {c} 片段已入库',
+      'kb.allIngested': '全部读取完成 — {f} 个文件 · {c} 片段',
       'kb.privacy': '数据 100% 本地 · 断网可用',
       'empty.title': '本地私有智能体',
       'empty.sub1': '检索你的知识库，生成可追溯的回答。',
@@ -1046,7 +1058,43 @@
     }
     loadKB();
   });
-  $('rescan-btn').addEventListener('click', () => ingestFileFromDir(''));
+  const folderInput = $('folder-input');
+  const scanAllBtn = $('scan-all-btn');
+  // ② 批量扫描：选中一个文件夹，导入其中全部文档
+  $('folder-btn').addEventListener('click', () => folderInput.click());
+  folderInput.addEventListener('change', async () => {
+    const files = [...folderInput.files];
+    folderInput.value = '';
+    if (!files.length) return;
+    toast(t('kb.scanning'));
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    try {
+      const resp = await fetch('/api/ingest_many', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (data.ok) toast(t('kb.folderIngested', { n: data.count, c: data.total_chunks }));
+      else toast(data.detail || 'error', true);
+    } catch (e) {
+      toast(e.message, true);
+    }
+    loadKB();
+  });
+  // ③ 全部读取：扫描本机所有受支持的文档
+  scanAllBtn.addEventListener('click', async () => {
+    scanAllBtn.disabled = true;
+    toast(t('kb.allScanning'));
+    try {
+      const resp = await fetch('/api/ingest_all', { method: 'POST' });
+      const data = await resp.json();
+      if (data.ok) toast(t('kb.allIngested', { f: data.found, c: data.total_chunks }));
+      else toast(data.detail || 'error', true);
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      scanAllBtn.disabled = false;
+    }
+    loadKB();
+  });
 
   /* ---------- GPU 监控 ---------- */
   const gpuCtx = gpuChart.getContext('2d');

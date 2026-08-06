@@ -94,7 +94,7 @@ def _stream_bridge(gen, q: asyncio.Queue, loop):
 
 
 # ------------------------------------------------------------------ FastAPI
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -158,6 +158,80 @@ async def api_ingest(file: UploadFile = File(...)):
         raise HTTPException(500, f"解析失败: {e}")
 
 
+@app.post("/api/ingest_many")
+async def api_ingest_many(files: list[UploadFile] = File(...)):
+    """批量导入：一次接收多个文件（用于"扫描文件夹"的浏览器文件夹选择器）。"""
+    llm, rag, _ = _get_shared()
+    os.makedirs(DOCS_DIR, exist_ok=True)
+    total, ok = 0, 0
+    for f in files:
+        safe = os.path.basename(f.filename or "")
+        if not safe:
+            continue
+        path = os.path.join(DOCS_DIR, safe)
+        try:
+            with open(path, "wb") as out:
+                shutil.copyfileobj(f.file, out)
+            total += rag.add_document(path)
+            ok += 1
+        except Exception:
+            pass
+    return {"ok": True, "total_chunks": total, "count": ok}
+
+
+# 全盘扫描时跳过的目录（缓存 / 依赖 / 系统 / 应用数据 / 浏览器数据，避免无关内容）
+_SKIP_DIRS = {"appdata", "application data", "roaming", "local", "locallow",
+              "node_modules", "venv", ".venv", "env", ".env", ".git",
+              "__pycache__", ".cache", ".gradle", ".m2", ".idea", ".vscode",
+              "site-packages", ".claude", ".kimi", ".grok", ".cursor", "mempalace",
+              "temp", "tmp", "windows", "program files", "program files (x86)",
+              "programdata", "recycle", "onedrive",
+              "user data", "chrome", "chromeprofilebackup", "mozilla", "firefox",
+              "google", "chrome profile"}
+_MAX_ALL_FILES = 200          # 全盘读取的文件数上限（防过载）
+_MAX_FILE_MB = 50             # 单文件大小上限
+# "全部读取"只收真正的文档格式（排除 .json 配置 / .txt 日志等噪声）
+_ALL_DOC_EXTS = {".pdf", ".docx", ".md", ".csv", ".xlsx", ".pptx"}
+
+
+@app.post("/api/ingest_all")
+def api_ingest_all():
+    """全部读取：扫描本机用户目录下的文档，全部导入知识库。
+
+    只收真正的文档格式（PDF / Word / Markdown / Excel / PPT），
+    自动跳过缓存、依赖、系统、应用数据与浏览器数据目录——
+    避免把配置文件和日志等噪声收进来。
+    """
+    llm, rag, _ = _get_shared()
+    home = os.path.expanduser("~")
+    found = []
+    for root, dirs, files in os.walk(home):
+        dirs[:] = [d for d in dirs
+                   if d.lower() not in _SKIP_DIRS and not d.startswith(".")]
+        for fn in files:
+            ext = os.path.splitext(fn)[1].lower()
+            if ext not in _ALL_DOC_EXTS:
+                continue
+            p = os.path.join(root, fn)
+            try:
+                if os.path.getsize(p) > _MAX_FILE_MB * 1024 * 1024:
+                    continue
+            except OSError:
+                continue
+            found.append(p)
+            if len(found) >= _MAX_ALL_FILES:
+                break
+        if len(found) >= _MAX_ALL_FILES:
+            break
+    total = 0
+    for p in found:
+        try:
+            total += rag.add_document(p)
+        except Exception:
+            pass
+    return {"ok": True, "total_chunks": total, "found": len(found)}
+
+
 @app.get("/api/documents")
 def api_documents():
     llm, rag, _ = _get_shared()
@@ -212,6 +286,23 @@ def api_ingest_dir():
     llm, rag, _ = _get_shared()
     n = rag.index_dir(DOCS_DIR)
     return {"ok": True, "total_chunks": n}
+
+
+@app.post("/api/ingest_path")
+def api_ingest_path(payload: dict = Body(...)):
+    """把用户指定的本地目录下的受支持文档导入知识库。
+
+    用途：让用户决定"检索哪些本地内容"——输入一个文件夹路径，
+    只把这些文件收进知识库，搜索范围严格限定在已导入的文档内。
+    """
+    llm, rag, _ = _get_shared()
+    path = (payload.get("path") or "").strip().strip('"').strip("'")
+    if not path:
+        raise HTTPException(400, "目录路径不能为空")
+    if not os.path.isdir(path):
+        raise HTTPException(400, f"目录不存在或不可读: {path}")
+    n = rag.index_dir(path)
+    return {"ok": True, "total_chunks": n, "path": path}
 
 
 # ----------------------------------------------------------------- 会话
