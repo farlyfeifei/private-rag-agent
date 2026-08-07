@@ -18,6 +18,18 @@
 
 ---
 
+## 📸 功能截图
+
+| 空状态首页 | 知识库 & 设置面板 | 单 Agent 问答 |
+|---|---|---|
+| ![空状态](docs/screenshots/01_empty_state.png) | ![知识库](docs/screenshots/02_knowledge_base.png) | ![单Agent问答](docs/screenshots/03_single_agent_qa.png) |
+
+| 多 Agent 并行协作 | GPU 监控面板 | 中文界面（双语切换） |
+|---|---|---|
+| ![多Agent](docs/screenshots/04_multi_agent.png) | ![GPU监控](docs/screenshots/05_gpu_monitor.png) | ![中文界面](docs/screenshots/06_chinese_ui.png) |
+
+---
+
 ## ✨ 快速开始
 
 ### 环境要求

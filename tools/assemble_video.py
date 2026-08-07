@@ -14,8 +14,20 @@ NARR = "demo/narration"
 OUT = "demo"
 W, H = 1440, 860
 
-# 各镜目标时长（秒，与旁白对齐；shot4 由采集帧数决定）
-DUR = {"shot1": 14, "shot2": 14, "shot3": 26, "shot5": 22, "shot6": 10}
+# 镜头播放顺序（8 镜：新增 shot8 中英切换 + shot7 库外诚实）
+ORDER = ["shot1", "shot2", "shot8", "shot3", "shot7", "shot4", "shot5", "shot6"]
+
+
+def narr_dur(shot):
+    """读旁白 mp3 实测时长（秒），视频段按此对齐，保证音画同步。"""
+    mp3 = os.path.join(NARR, shot + ".mp3")
+    r = subprocess.run([FF, "-i", mp3], capture_output=True, text=True)
+    import re
+    m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", r.stderr)
+    if not m:
+        return 12.0
+    h, mm, s = m.groups()
+    return int(h) * 3600 + int(mm) * 60 + float(s)
 
 
 def run(cmd):
@@ -37,21 +49,20 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     shot_files = []
 
-    # 1) 各镜编码为视频段（fps 由帧数/目标时长决定）
-    for shot in ["shot1", "shot2", "shot3", "shot4", "shot5", "shot6"]:
+    # 1) 各镜编码为视频段（时长 = 旁白实测时长，fps 由帧数决定 → 音画同步）
+    for shot in ORDER:
         frames = frames_of(shot)
         if not frames:
             print(f"skip {shot}: no frames"); continue
         n = len(frames)
-        dur = DUR.get(shot)
-        if shot == "shot4":
-            dur = 32  # 多 Agent 提速到 32s
+        dur = narr_dur(shot)
         fps = n / dur if dur and dur > 0 else 1.0
         pat = os.path.join(ROOT, shot, "frame_%04d.png")
         outv = os.path.join(OUT, f"seg_{shot}.mp4")
         cmd = [FF, "-y", "-framerate", f"{fps:.4f}", "-i", pat,
                "-c:v", "libx264", "-preset", "fast", "-crf", "20",
                "-pix_fmt", "yuv420p", "-vf", f"scale={W}:{H}",
+               "-r", "25", "-vsync", "cfr",   # 输出恒定 25fps → concat 时间戳正确
                "-an", outv]
         if run(cmd):
             shot_files.append((shot, outv, dur))

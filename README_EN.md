@@ -20,6 +20,18 @@ Private RAG Agent is a **fully offline, locally hosted, private multi-agent RAG 
 
 ---
 
+## Screenshots
+
+| Empty start page | Knowledge base & settings | Single-agent Q&A |
+|---|---|---|
+| ![Empty state](docs/screenshots/01_empty_state.png) | ![Knowledge base](docs/screenshots/02_knowledge_base.png) | ![Single agent Q&A](docs/screenshots/03_single_agent_qa.png) |
+
+| Multi-agent parallel orchestration | GPU monitor panel | Chinese interface (bilingual) |
+|---|---|---|
+| ![Multi-agent](docs/screenshots/04_multi_agent.png) | ![GPU monitor](docs/screenshots/05_gpu_monitor.png) | ![Chinese UI](docs/screenshots/06_chinese_ui.png) |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
